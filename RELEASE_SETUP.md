@@ -45,25 +45,36 @@ notarizes if secrets are set), and creates the GitHub Release. Release notes are
 taken from the matching `## 1.9.7` section of `CHANGELOG.md`, falling back to the
 commit log if that section is absent.
 
-## IMPORTANT: distribution channel decides entitlements
+## Two channels: entitlements
 
-This project's committed entitlements (`Flycut.entitlements`) target the **Mac App
-Store**: App Sandbox on, an iCloud (CloudKit) container, and `aps-environment`.
-Those are correct for a MAS submission but are **not** what a Developer-ID,
-direct-download DMG wants:
+1.9.7 ships on **both** channels, which need different entitlements:
 
-- **Mac App Store update** — don't use this workflow. Archive in Xcode and upload
-  to App Store Connect (Organizer → Distribute App). Keep the entitlements as-is.
-- **Developer ID direct-download DMG (this workflow)** — for a clean notarized
-  build you'll typically want to drop the sandbox + MAS-only iCloud/`aps`
-  entitlements (the way the community fork does). Thanks to the CloudKit guard
-  merged in 1.9.7, the app already **runs safely without the iCloud entitlement**
-  (sync just no-ops), so an un-entitled Developer ID build won't crash — but iCloud
-  sync will be unavailable unless you register a Developer-ID iCloud container.
+- **`Flycut.entitlements`** — Mac App Store build. App Sandbox on, iCloud
+  (CloudKit) container, `aps-environment`. Unchanged; used by the normal Release
+  config and the MAS submission.
+- **`FlycutDeveloperID.entitlements`** — Developer ID direct-download build. Not
+  sandboxed, no MAS-only iCloud/`aps` keys (invalid without a provisioning profile
+  under Developer ID). The workflow passes this via `CODE_SIGN_ENTITLEMENTS` in the
+  archive step. The CloudKit guard added in 1.9.7 means the app runs safely without
+  the iCloud entitlement (sync just no-ops); iCloud sync is unavailable in the
+  direct-download build unless you register a Developer-ID iCloud container.
 
-  To do this without disturbing the MAS build, add a separate entitlements file
-  (e.g. `FlycutDeveloperID.entitlements`) and pass
-  `CODE_SIGN_ENTITLEMENTS=FlycutDeveloperID.entitlements` in the archive step.
+### Channel A — Developer ID DMG (this workflow)
 
-**Decide the channel before the first real release** — it's the one thing this
-workflow can't decide for you.
+Configure the secrets above, then push a `v*` tag (see below). The workflow builds
+with `FlycutDeveloperID.entitlements`, notarizes, staples, and publishes the DMG.
+
+> First-run caveat: this app bundles a login-item helper and an embedded
+> framework. Notarization requires every nested binary to be Developer ID-signed
+> with the hardened runtime. That can only be fully validated once
+> `CERTIFICATES_P12` is set and the first tagged build runs — expect to iterate
+> once on nested-code signing if notarization reports an unsigned/instrumented
+> nested binary. (The command-line `CODE_SIGN_ENTITLEMENTS` override also applies
+> to the helper, which is harmless — it only launches the main app.)
+
+### Channel B — Mac App Store update
+
+Don't use this workflow. In Xcode: select the **Flycut** scheme, Product → Archive,
+then Organizer → **Distribute App → App Store Connect**. This uses
+`Flycut.entitlements` (sandbox + iCloud) unchanged and goes through App Review.
+Bump `MARKETING_VERSION` (already 1.9.7) and submit the same source as the DMG.

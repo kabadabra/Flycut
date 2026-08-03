@@ -87,10 +87,13 @@ jobs:
     - name: Build and archive
       run: |
         if [ -n "$SIGNING_IDENTITY" ]; then
+          # Developer ID / direct-download build: use the non-sandboxed entitlements
+          # (see FlycutDeveloperID.entitlements). The MAS build keeps Flycut.entitlements.
           xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
             -archivePath build/Flycut.xcarchive archive \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             DEVELOPMENT_TEAM="${{ secrets.NOTARY_TEAM_ID }}" \
+            CODE_SIGN_ENTITLEMENTS=FlycutDeveloperID.entitlements \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime"
         else
           echo "::warning::No Developer ID certificate configured - building ad-hoc (test build only)."

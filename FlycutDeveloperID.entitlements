@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Entitlements for the Developer ID, direct-download (notarized DMG) build.
+	  Deliberately NOT sandboxed, and without the Mac App Store-only iCloud
+	  container and aps-environment keys, which require a matching provisioning
+	  profile and are invalid for Developer ID distribution.
+
+	  The CloudKit guard added in 1.9.7 means the app runs safely without the
+	  iCloud entitlement (sync simply no-ops). Accessibility (for synthesizing
+	  paste) is governed by TCC, not entitlements. Apple Events automation is
+	  kept because, under the hardened runtime, the login-item helper sends
+	  Apple Events to System Events.
+
+	  The Mac App Store build continues to use Flycut.entitlements unchanged.
+	-->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>
