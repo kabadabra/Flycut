@@ -190,7 +190,25 @@ static const float lineHeight = 16;
 
 -(NSColor*) backgroundColor
 {
-    return [self sizedBezelBackgroundWithRadius:25.0 withAlpha:[[NSUserDefaults standardUserDefaults] floatForKey:@"bezelAlpha"]];
+    NSSize backgroundSize = [self frame].size;
+    float backgroundAlpha = [[NSUserDefaults standardUserDefaults] floatForKey:@"bezelAlpha"];
+
+    // AppKit may call -update frequently on modern macOS. Rebuilding the
+    // bitmap pattern on every update is unnecessarily expensive and can keep
+    // the main thread busy while the bezel is idle. Rebuild only when one of
+    // the inputs that affects the background has changed.
+    if (backgroundColorCache != nil
+        && NSEqualSizes(backgroundColorCacheSize, backgroundSize)
+        && backgroundColorCacheAlpha == backgroundAlpha
+        && backgroundColorCacheColor == color)
+        return backgroundColorCache;
+
+    [backgroundColorCache release];
+    backgroundColorCache = [[self sizedBezelBackgroundWithRadius:25.0 withAlpha:backgroundAlpha] retain];
+    backgroundColorCacheSize = backgroundSize;
+    backgroundColorCacheAlpha = backgroundAlpha;
+    backgroundColorCacheColor = color;
+    return backgroundColorCache;
 }
 
 - (void) setAlpha:(float)newValue
@@ -314,6 +332,7 @@ static const float lineHeight = 16;
 
 - (void)dealloc
 {
+	[backgroundColorCache release];
 	[textField release];
 	[charField release];
 	[iconView release];
