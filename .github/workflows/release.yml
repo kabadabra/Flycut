@@ -10,9 +10,10 @@ name: Build and Release
 # Required secrets for a proper release (see RELEASE_SETUP.md):
 #   CERTIFICATES_P12         base64 of your "Developer ID Application" .p12
 #   CERTIFICATES_PASSWORD    password for that .p12
-#   NOTARY_APPLE_ID          Apple ID email used for notarization
-#   NOTARY_APP_PASSWORD      app-specific password for that Apple ID
-#   NOTARY_TEAM_ID           your Apple Developer Team ID (e.g. S8JLSG5ES7)
+#   NOTARY_TEAM_ID           your Apple Developer Team ID (e.g. S8JLSG5ES7); used as DEVELOPMENT_TEAM when signing
+#   NOTARY_KEY               base64 of your App Store Connect API key (.p8)
+#   NOTARY_KEY_ID            the API key's Key ID
+#   NOTARY_ISSUER_ID         the API key's Issuer ID
 
 on:
   push:
@@ -28,7 +29,7 @@ jobs:
     runs-on: macos-latest
     env:
       HAS_CERTIFICATES: ${{ secrets.CERTIFICATES_P12 != '' }}
-      HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_APP_PASSWORD != '' && secrets.NOTARY_TEAM_ID != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY != '' && secrets.NOTARY_KEY_ID != '' && secrets.NOTARY_ISSUER_ID != '' }}
 
     steps:
     - name: Checkout code
@@ -123,16 +124,19 @@ jobs:
     - name: Notarize and staple
       if: env.HAS_NOTARY == 'true' && env.SIGNING_IDENTITY != ''
       env:
-        NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
-        NOTARY_APP_PASSWORD: ${{ secrets.NOTARY_APP_PASSWORD }}
-        NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+        NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+        NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
       run: |
-        echo "Submitting DMG to Apple notary service..."
+        echo "Submitting DMG to Apple notary service (App Store Connect API key)..."
+        # NOTARY_KEY holds the base64-encoded .p8 App Store Connect API key.
+        echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary_key.p8"
         xcrun notarytool submit build/Flycut.dmg \
-          --apple-id "$NOTARY_APPLE_ID" \
-          --password "$NOTARY_APP_PASSWORD" \
-          --team-id "$NOTARY_TEAM_ID" \
+          --key "$RUNNER_TEMP/notary_key.p8" \
+          --key-id "$NOTARY_KEY_ID" \
+          --issuer "$NOTARY_ISSUER_ID" \
           --wait
+        rm -f "$RUNNER_TEMP/notary_key.p8"
         xcrun stapler staple build/Flycut.dmg
         xcrun stapler validate build/Flycut.dmg
         echo "Notarized and stapled."

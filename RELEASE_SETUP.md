@@ -14,15 +14,27 @@ add them as you go.
 | --- | --- |
 | `CERTIFICATES_P12` | base64 of your **Developer ID Application** certificate exported as `.p12` |
 | `CERTIFICATES_PASSWORD` | the password you set when exporting the `.p12` |
-| `NOTARY_APPLE_ID` | Apple ID email used for notarization |
-| `NOTARY_APP_PASSWORD` | an [app-specific password](https://support.apple.com/en-us/102654) for that Apple ID |
-| `NOTARY_TEAM_ID` | your Apple Developer Team ID (`S8JLSG5ES7`) |
+| `NOTARY_TEAM_ID` | your Apple Developer Team ID (`S8JLSG5ES7`); used as the signing `DEVELOPMENT_TEAM` |
+| `NOTARY_KEY` | base64 of your App Store Connect API key (`.p8`) |
+| `NOTARY_KEY_ID` | the API key's **Key ID** |
+| `NOTARY_ISSUER_ID` | the API key's **Issuer ID** |
 
-Export the `.p12` and base64-encode it:
+Notarization uses an **App Store Connect API key** (not an Apple-ID app-specific
+password): it's a team credential, independent of any personal account, and cleanly
+revocable. Create it at **App Store Connect → Users and Access → Integrations → App
+Store Connect API**, generate a **Team Key** (role: Developer), and **download the
+`.p8` once** (it can't be re-downloaded). Note the Key ID and Issuer ID shown there.
+
+Export the signing `.p12` and base64-encode the credentials:
 
 ```
 # In Keychain Access: export your "Developer ID Application" identity as Certificates.p12
-base64 -i Certificates.p12 | pbcopy   # paste into the CERTIFICATES_P12 secret
+base64 -i Certificates.p12 | gh secret set CERTIFICATES_P12 -R TermiT/Flycut
+base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set NOTARY_KEY -R TermiT/Flycut
+gh secret set CERTIFICATES_PASSWORD -R TermiT/Flycut   # prompts for the .p12 passphrase
+gh secret set NOTARY_KEY_ID -R TermiT/Flycut --body "XXXXXXXXXX"
+gh secret set NOTARY_ISSUER_ID -R TermiT/Flycut --body "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+gh secret set NOTARY_TEAM_ID -R TermiT/Flycut --body "S8JLSG5ES7"
 ```
 
 Behaviour by secrets configured:
