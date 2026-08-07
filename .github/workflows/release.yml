@@ -184,7 +184,16 @@ jobs:
         } > release_notes.md
         cat release_notes.md
 
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Flycut-dmg
+        path: build/Flycut.dmg
+
+    # Publish a GitHub Release only for tag pushes. A manual (workflow_dispatch)
+    # run builds + signs + notarizes as a dry run without publishing anything.
     - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: build/Flycut.dmg
