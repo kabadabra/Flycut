@@ -85,32 +85,38 @@ jobs:
         echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
         echo "Using identity: $IDENTITY"
 
-    - name: Build and archive
+    - name: Build and archive (unsigned)
       run: |
-        if [ -n "$SIGNING_IDENTITY" ]; then
-          # Developer ID / direct-download build: use the non-sandboxed entitlements
-          # (see FlycutDeveloperID.entitlements). The MAS build keeps Flycut.entitlements.
-          xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
-            -archivePath build/Flycut.xcarchive archive \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
-            DEVELOPMENT_TEAM="${{ secrets.NOTARY_TEAM_ID }}" \
-            CODE_SIGN_ENTITLEMENTS=FlycutDeveloperID.entitlements \
-            OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime"
-        else
-          echo "::warning::No Developer ID certificate configured - building ad-hoc (test build only)."
-          xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
-            -archivePath build/Flycut.xcarchive archive \
-            CODE_SIGNING_ALLOWED=NO
-        fi
+        # Always archive unsigned, then sign explicitly in the next step. This avoids
+        # xcodebuild applying a single CODE_SIGN_ENTITLEMENTS to every target (the
+        # embedded framework has no root-level entitlements file and would fail).
+        xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
+          -archivePath build/Flycut.xcarchive archive \
+          CODE_SIGNING_ALLOWED=NO
 
-    - name: Export app from archive
+    - name: Export and sign app
       run: |
         mkdir -p build/Export
         cp -R build/Flycut.xcarchive/Products/Applications/Flycut.app build/Export/
-        if [ -z "$SIGNING_IDENTITY" ]; then
-          codesign --force --deep --sign - build/Export/Flycut.app
+        APP="build/Export/Flycut.app"
+        if [ -n "$SIGNING_IDENTITY" ]; then
+          # Sign inside-out with Developer ID + hardened runtime + secure timestamp.
+          # Framework: no entitlements. Helper + main app: the Developer ID (non-sandbox)
+          # entitlements. The MAS build (Flycut.entitlements) is untouched.
+          FW="$APP/Contents/Frameworks/MJCloudKitUserDefaultsSync.framework"
+          [ -d "$FW" ] && codesign --force --options runtime --timestamp \
+            --sign "$SIGNING_IDENTITY" "$FW"
+          HELPER="$APP/Contents/Library/LoginItems/FlycutHelper.app"
+          [ -d "$HELPER" ] && codesign --force --options runtime --timestamp \
+            --entitlements FlycutDeveloperID.entitlements --sign "$SIGNING_IDENTITY" "$HELPER"
+          codesign --force --options runtime --timestamp \
+            --entitlements FlycutDeveloperID.entitlements --sign "$SIGNING_IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+        else
+          echo "::warning::No Developer ID certificate configured - ad-hoc signing (test build only)."
+          codesign --force --deep --sign - "$APP"
         fi
-        codesign -dv --verbose=2 build/Export/Flycut.app || true
+        codesign -dv --verbose=2 "$APP" || true
 
     - name: Create DMG
       run: |
