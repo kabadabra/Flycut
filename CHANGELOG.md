@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 (unreleased)
+## 2.0.0 (2026-09-24)
 
 Fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) for ongoing macOS compatibility. Original Flycut by General Arcade, Gennadiy Potapov, and contributors; based on Jumpcut by Steve Cook.
 
