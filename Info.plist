@@ -29,7 +29,7 @@
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Flycut needs this permission to be able to paste text into other applications, and add itself to Login Items to be launched on login.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>(c) General Arcade, 2011-2020</string>
+	<string>Copyright 2011-2026 General Arcade and Flycut contributors</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

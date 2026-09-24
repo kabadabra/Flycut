@@ -9,3 +9,5 @@ build/
 *.mode2v3
 xcuserdata
 xcshareddata
+graphify-out/
+.codex/hooks.json
