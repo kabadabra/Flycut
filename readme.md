@@ -25,25 +25,23 @@ Run the local build with `open build/DerivedData/Build/Products/Debug/Flycut.app
 
 ## Moving to Flycut 2.0
 
-Quit all Flycut versions before moving preferences. If you used the original Flycut, back up its preferences and import them into Flycut 2.0:
+Quit all Flycut versions before moving preferences. If you used the sandboxed original Flycut, import its preferences file into Flycut 2.0:
 
 ```sh
-defaults export com.generalarcade.flycut "$HOME/Desktop/Flycut-original.plist"
-defaults import com.edynamics.flycut "$HOME/Desktop/Flycut-original.plist"
+defaults import com.edynamics.flycut "$HOME/Library/Containers/com.generalarcade.flycut/Data/Library/Preferences/com.generalarcade.flycut.plist"
 defaults delete com.edynamics.flycut syncSettingsViaICloud 2>/dev/null || true
 defaults delete com.edynamics.flycut syncClippingsViaICloud 2>/dev/null || true
 ```
 
-If you used an earlier build of this fork with the `com.kabadabra.flycut` identity, import that domain instead:
+If macOS denies your terminal access to the original app's container, copy that `.plist` in Finder to a private local folder and import the copy. If you used an earlier build of this fork with the `com.kabadabra.flycut` identity, import its preferences file instead:
 
 ```sh
-defaults export com.kabadabra.flycut "$HOME/Desktop/Flycut-fork-preview.plist"
-defaults import com.edynamics.flycut "$HOME/Desktop/Flycut-fork-preview.plist"
+defaults import com.edynamics.flycut "$HOME/Library/Preferences/com.kabadabra.flycut.plist"
 defaults delete com.edynamics.flycut syncSettingsViaICloud 2>/dev/null || true
 defaults delete com.edynamics.flycut syncClippingsViaICloud 2>/dev/null || true
 ```
 
-Choose the source with the history you want to keep; the second import replaces the first. Each source domain remains untouched. Launch Flycut 2.0 afterward and grant its own clipboard and Accessibility permissions, because macOS treats the new identity as a separate app.
+Choose the source with the history you want to keep; a second import replaces the first. Importing the `.plist` directly preserves the saved clipping store, which `defaults export` may omit. Each source domain remains untouched. Launch Flycut 2.0 afterward and grant its own clipboard and Accessibility permissions, because macOS treats the new identity as a separate app.
 
 ## Development tools
 
