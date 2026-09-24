@@ -40,3 +40,17 @@ graphify hook install
 ## Modernization roadmap
 
 Keep the AppKit UI and data format stable through the macOS 27 release. After that, isolate and test clipboard capture, hotkeys, and login registration one at a time. Swift can replace each module behind a small Objective-C interface; a whole-app rewrite should wait until equivalent behavior and saved-history migration have automated coverage.
+
+## Updating from upstream
+
+The local `origin` remote is `kabadabra/Flycut`; `upstream` is `TermiT/Flycut`. Bring in upstream fixes through a review branch so fork-specific identity and release settings remain visible in the diff:
+
+```sh
+git fetch upstream
+git switch master
+git pull --ff-only origin master
+git switch -c update/upstream-YYYYMMDD
+git merge upstream/master
+```
+
+Resolve any conflicts, run the macOS build and local smoke check, then open a pull request into the fork's `master`. GitHub also displays the upstream relationship and offers a **Sync fork** control, but review the resulting changes before relying on a new build.
