@@ -1,92 +1,39 @@
-# Cutting a Flycut release
+# Releasing the Flycut fork
 
-Releases are produced by `.github/workflows/release.yml`, which runs when a
-`v*` tag is pushed. It builds the macOS app, packages it in a DMG, optionally
-signs + notarizes it, and publishes a GitHub Release with the DMG attached.
+The public macOS channel is a Developer ID signed, notarized DMG built by [the release workflow](.github/workflows/release.yml). A tag named `vX.Y.Z` triggers publication. `workflow_dispatch` builds an artifact for testing without publishing a GitHub Release.
 
-## One-time setup: GitHub secrets
+## One-time Apple setup
 
-Add these under **Settings → Secrets and variables → Actions**. The workflow
-adapts to whichever are present, so you can start with none (test build) and
-add them as you go.
+Use **your own** Apple Developer team and a Developer ID Application certificate. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
 
-| Secret | Purpose |
+In the fork's GitHub repository, add these Actions secrets:
+
+| Secret | Value |
 | --- | --- |
-| `CERTIFICATES_P12` | base64 of your **Developer ID Application** certificate exported as `.p12` |
-| `CERTIFICATES_PASSWORD` | the password you set when exporting the `.p12` |
-| `NOTARY_TEAM_ID` | your Apple Developer Team ID (`S8JLSG5ES7`); used as the signing `DEVELOPMENT_TEAM` |
-| `NOTARY_KEY` | base64 of your App Store Connect API key (`.p8`) |
-| `NOTARY_KEY_ID` | the API key's **Key ID** |
-| `NOTARY_ISSUER_ID` | the API key's **Issuer ID** |
+| `CERTIFICATES_P12` | Base64-encoded Developer ID Application `.p12` |
+| `CERTIFICATES_PASSWORD` | Password used to export the `.p12` |
+| `NOTARY_KEY` | Base64-encoded App Store Connect `.p8` key |
+| `NOTARY_KEY_ID` | API key's Key ID |
+| `NOTARY_ISSUER_ID` | API key's Issuer ID |
 
-Notarization uses an **App Store Connect API key** (not an Apple-ID app-specific
-password): it's a team credential, independent of any personal account, and cleanly
-revocable. Create it at **App Store Connect → Users and Access → Integrations → App
-Store Connect API**, generate a **Team Key** (role: Developer), and **download the
-`.p8` once** (it can't be re-downloaded). Note the Key ID and Issuer ID shown there.
+For example, after setting `REPO` to your fork's `owner/Flycut` name:
 
-Export the signing `.p12` and base64-encode the credentials:
-
-```
-# In Keychain Access: export your "Developer ID Application" identity as Certificates.p12
-base64 -i Certificates.p12 | gh secret set CERTIFICATES_P12 -R TermiT/Flycut
-base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set NOTARY_KEY -R TermiT/Flycut
-gh secret set CERTIFICATES_PASSWORD -R TermiT/Flycut   # prompts for the .p12 passphrase
-gh secret set NOTARY_KEY_ID -R TermiT/Flycut --body "XXXXXXXXXX"
-gh secret set NOTARY_ISSUER_ID -R TermiT/Flycut --body "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-gh secret set NOTARY_TEAM_ID -R TermiT/Flycut --body "S8JLSG5ES7"
+```sh
+REPO=kabadabra/Flycut
+base64 -i Certificates.p12 | gh secret set CERTIFICATES_P12 -R "$REPO"
+base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set NOTARY_KEY -R "$REPO"
+gh secret set CERTIFICATES_PASSWORD -R "$REPO"
+gh secret set NOTARY_KEY_ID -R "$REPO" --body 'XXXXXXXXXX'
+gh secret set NOTARY_ISSUER_ID -R "$REPO" --body 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 ```
 
-Behaviour by secrets configured:
+Do not commit credentials. Tag builds stop before publication if signing or notarization credentials are missing. A manual run without them still produces an ad hoc signed test DMG that Gatekeeper will warn about.
 
-- **none** → ad-hoc signed app in the DMG. Gatekeeper will warn; use only for testing.
-- **signing only** → Developer ID signed with hardened runtime (still warned until notarized).
-- **signing + notary** → signed, notarized, and stapled — installs cleanly with no warning.
+## Cut a release
 
-## Cutting a release
+1. Verify the macOS build and the `com.kabadabra.flycut` bundle identifier.
+2. Update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the macOS Flycut target. Add a matching `## X.Y.Z` section to `CHANGELOG.md`.
+3. Push a `vX.Y.Z` tag from the reviewed commit. The workflow signs nested code, notarizes and staples the DMG, and publishes it on the fork.
+4. Download the public DMG and verify it on a separate Mac before telling users to upgrade.
 
-```
-# 1. Make sure master is green and the version is bumped (MARKETING_VERSION).
-# 2. Tag and push:
-git tag v1.9.7
-git push origin v1.9.7
-```
-
-The workflow stamps `MARKETING_VERSION` from the tag, builds, packages, (signs +
-notarizes if secrets are set), and creates the GitHub Release. Release notes are
-taken from the matching `## 1.9.7` section of `CHANGELOG.md`, falling back to the
-commit log if that section is absent.
-
-## Two channels: entitlements
-
-1.9.7 ships on **both** channels, which need different entitlements:
-
-- **`Flycut.entitlements`** — Mac App Store build. App Sandbox on, iCloud
-  (CloudKit) container, `aps-environment`. Unchanged; used by the normal Release
-  config and the MAS submission.
-- **`FlycutDeveloperID.entitlements`** — Developer ID direct-download build. Not
-  sandboxed, no MAS-only iCloud/`aps` keys (invalid without a provisioning profile
-  under Developer ID). The workflow passes this via `CODE_SIGN_ENTITLEMENTS` in the
-  archive step. The CloudKit guard added in 1.9.7 means the app runs safely without
-  the iCloud entitlement (sync just no-ops); iCloud sync is unavailable in the
-  direct-download build unless you register a Developer-ID iCloud container.
-
-### Channel A — Developer ID DMG (this workflow)
-
-Configure the secrets above, then push a `v*` tag (see below). The workflow builds
-with `FlycutDeveloperID.entitlements`, notarizes, staples, and publishes the DMG.
-
-> First-run caveat: this app bundles a login-item helper and an embedded
-> framework. Notarization requires every nested binary to be Developer ID-signed
-> with the hardened runtime. That can only be fully validated once
-> `CERTIFICATES_P12` is set and the first tagged build runs — expect to iterate
-> once on nested-code signing if notarization reports an unsigned/instrumented
-> nested binary. (The command-line `CODE_SIGN_ENTITLEMENTS` override also applies
-> to the helper, which is harmless — it only launches the main app.)
-
-### Channel B — Mac App Store update
-
-Don't use this workflow. In Xcode: select the **Flycut** scheme, Product → Archive,
-then Organizer → **Distribute App → App Store Connect**. This uses
-`Flycut.entitlements` (sandbox + iCloud) unchanged and goes through App Review.
-Bump `MARKETING_VERSION` (already 1.9.7) and submit the same source as the DMG.
+The app can read and save local history without iCloud. CloudKit sync is not configured for the fork, and the original Mac App Store channel is not controlled here. The app's new identifier means existing users can keep the upstream app installed and import their saved preferences into this fork as described in the README.

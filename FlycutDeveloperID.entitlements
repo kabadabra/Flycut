@@ -14,7 +14,7 @@
 	  kept because, under the hardened runtime, the login-item helper sends
 	  Apple Events to System Events.
 
-	  The Mac App Store build continues to use Flycut.entitlements unchanged.
+	  This fork's Xcode sandbox entitlements do not include an iCloud container.
 	-->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>

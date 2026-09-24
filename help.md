@@ -56,3 +56,10 @@ The Flycut menu allows you to select from the most recent items in the main clip
 
 The preferences panel allows you to customize a large number of settings, several of which should be documented here but will have to wait for another day.
 
+**macOS 27 permissions**
+
+Flycut reads new text from the general clipboard to keep its history. If macOS asks for clipboard access, choose **Always Allow** so automatic capture continues. If capture stops, review Flycut's clipboard permission in System Settings and copy a new piece of text to test it. Flycut does not clear your clipboard when it starts.
+
+To paste a clipping into another app, grant this fork of Flycut access under **System Settings > Privacy & Security > Accessibility**. Because the fork has a new app identifier, permission granted to the original Flycut does not transfer. If pasting still fails after replacing the app, remove the old Flycut entry from Accessibility, add the new app, then relaunch it.
+
+The **Open at Login** switch uses macOS Login Items. If macOS asks for approval, open **System Settings > General > Login Items & Extensions** and allow Flycut. The direct-download fork does not currently provide iCloud sync; keep local history saving enabled in Preferences.

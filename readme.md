@@ -1,42 +1,45 @@
 # Flycut
-<a href="https://github.com/TermiT/Flycut/releases"><img src="http://a3.mzstatic.com/us/r1000/047/Purple/fb/53/f2/mzi.mcaxwyjm.175x175-75.png" /></a>
-<a href="https://macdownload.informer.com/flycut/"><img src="award-2021.png" /></a>
-<a href="https://macdownload.informer.com/flycut/"><img src="award-2022.png" /></a>
-<br />
-**Description:**
-Flycut is a clean and simple clipboard manager for developers. It's based on an open source app called Jumpcut.
 
-On the Mac, every time you copy a code piece, Flycut stores it in history. Later, you can paste it using Shift-Command-V even if you have something different in your current clipboard. You can change the hotkey and other settings in preferences.
+Flycut is a free, open source clipboard manager for macOS. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
 
-On iOS, every time you open Flycut, it checks for a new clipping and stores it in history. Later, you can tap any item in the history list to place it on the clipboard. You can also swipe web links in the history to open them without placing them on the clipboard.
+Copy text as usual. Flycut keeps a history of clippings, which you can open with **Shift-Command-V** or from its menu bar icon. The original iOS source remains in this repository, but the current fork focuses on macOS.
 
-Developed by developers for developers.
+## macOS support
 
-**Donation:**
-If you like Flycut, you can donate [here](https://paypal.me/flycut)
+The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.kabadabra.flycut`, so it can coexist with the original app. Clipboard history and settings use the new ID; see [migration](#moving-from-the-original-flycut).
 
-## Install
+Apple may ask whether Flycut can read the clipboard. Choose **Always Allow** for automatic history capture. Pasting a selected clipping also needs **Accessibility** access in System Settings > Privacy & Security > Accessibility. See the [Mac help](help.md) for troubleshooting.
 
-***For OSX 10.13 and older use DRM-Free version***
+## Build locally
 
-***For OSX 10.14 and later use either App Store or DRM-Free versions. But don't forget to give Flycut access in System Preferences -> Security & Privacy -> Privacy -> Accessibility. If you had previous version of Flycut installed, you might need to remove it from Accessibility first and add it again.***
+Open `Flycut.xcodeproj` in Xcode 27 and select the **Flycut** macOS scheme, or run:
 
-**Mac App Store:**
-Download from the App Store [here](http://itunes.apple.com/us/app/flycut-clipboard-manager/id442160987?mt=12)
+```sh
+xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath build/DerivedData build
+```
 
-**DRM-Free:**
-Download latest DRM-Free version [here](https://github.com/TermiT/Flycut/releases)
+The local build is ad hoc signed for development. A downloadable DMG should be signed and notarized with your own Apple Developer credentials; see [release setup](RELEASE_SETUP.md). iCloud sync is not provisioned for this fork, so use local history persistence. The original Flycut App Store listing is maintained by the original project, not this fork.
 
-**iOS App Store:**
-Download from the App Store [here](https://itunes.apple.com/us/app/flycut/id1273639655?mt=8)
+Run the local build with `open build/DerivedData/Build/Products/Debug/Flycut.app`. Install a tagged, notarized DMG for regular use when release credentials are configured.
 
-## Use
-**Documentation:**
-[Mac Help File](help.md) / [iOS Help File](help.iOS.md)
+## Moving from the original Flycut
 
-## Develop
-**Contributors:**
-Check the list of contributors [here](https://github.com/TermiT/Flycut/graphs/contributors)
+Quit both Flycut versions before moving preferences. Back up the original domain, then import it into the fork:
 
-**License:**
-MIT
+```sh
+defaults export com.generalarcade.flycut "$HOME/Desktop/Flycut-original.plist"
+defaults import com.kabadabra.flycut "$HOME/Desktop/Flycut-original.plist"
+defaults delete com.kabadabra.flycut syncSettingsViaICloud 2>/dev/null || true
+defaults delete com.kabadabra.flycut syncClippingsViaICloud 2>/dev/null || true
+```
+
+The import brings settings and any saved clipping history into the new domain. The original domain remains untouched. Launch the fork afterward and grant its own permissions; macOS treats it as a separate app.
+
+## Development tools
+
+QMD indexes this project's Markdown as the `flycut` collection. Graphify generates a local code graph. Both tools are optional for building Flycut; [developer notes](docs/DEVELOPING.md) show setup and refresh commands. The graph and search index are local artifacts, not part of the release.
+
+## Credits and license
+
+Original Flycut by General Arcade, Gennadiy Potapov, and contributors. Jumpcut by Steve Cook and contributors. This fork keeps the **Flycut** name and the original MIT license. See [acknowledgements](acknowledgements.txt) for included libraries and their authors. To support the original maintainers, see [their project](https://github.com/TermiT/Flycut).

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.8 (unreleased)
+
+Fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) for ongoing macOS compatibility. Original Flycut by General Arcade, Gennadiy Potapov, and contributors; based on Jumpcut by Steve Cook.
+
+- Build with Xcode 27 using a macOS 12 minimum deployment target.
+- Use ad hoc signing for local Debug builds so the embedded framework loads correctly.
+- Keep the macOS 27 menu bar click fix from upstream.
+- Preserve the existing clipboard at launch and discard stale background reads.
+- Use modern macOS Login Items registration on macOS 13 and later.
+- Use a separate fork app identity, `com.kabadabra.flycut`, and document migration from the original app.
+- Add QMD and Graphify developer setup and require signing plus notarization for public DMGs.
+
 ## 1.9.7 (2026-08-04)
 
 First release since 1.9.6 (2020). Focused on crash fixes and modern-macOS

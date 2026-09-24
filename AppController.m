@@ -196,8 +196,8 @@
 
 	// Create our pasteboard interface
     jcPasteboard = [NSPasteboard generalPasteboard];
-    [jcPasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
-    pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
+    // Observing the clipboard must not replace what the user copied before launch.
+    pbCount = [[NSNumber numberWithInteger:[jcPasteboard changeCount]] retain];
 
 	// Build the statusbar menu
     statusItem = [[[NSStatusBar systemStatusBar]
@@ -232,29 +232,25 @@
     [pollPBTimer fire];
     
     
-    // The load-on-startup check can be really slow, so this will be dispatched out so our thread isn't blocked.
-    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-    dispatch_async(queue, ^{
-        // FIXME: Should ask Gennadii if the "#ifdef SANDBOXING" should be removed and replaced with "if ([AppController isAppSandboxed])"
+    if (@available(macOS 13.0, *)) {
+        SMAppServiceStatus status = [SMAppService mainAppService].status;
+        [[NSUserDefaults standardUserDefaults] setBool:(status == SMAppServiceStatusEnabled ||
+                                                       status == SMAppServiceStatusRequiresApproval)
+                                                 forKey:@"loadOnStartup"];
+    } else {
+        // The legacy login registry can be slow, so keep its lookup off the UI thread.
+        dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+        dispatch_async(queue, ^{
 #ifdef SANDBOXING
-        NSPredicate *predicate = [NSPredicate predicateWithFormat:@"bundleIdentifier == %@", kFlycutHelperId];
-        NSArray *helperApp = [[[NSWorkspace sharedWorkspace] runningApplications] filteredArrayUsingPredicate:predicate];
-        BOOL helperLaunched = ([helperApp count] != 0);
-        [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:helperLaunched]
-                                                            forKey:@"loadOnStartup"];
+            NSPredicate *predicate = [NSPredicate predicateWithFormat:@"bundleIdentifier == %@", kFlycutHelperId];
+            NSArray *helperApp = [[[NSWorkspace sharedWorkspace] runningApplications] filteredArrayUsingPredicate:predicate];
+            [[NSUserDefaults standardUserDefaults] setBool:([helperApp count] != 0) forKey:@"loadOnStartup"];
 #else
-
-        // This can take five seconds, perhaps more, so do it in the background instead of holding up opening of the preference panel.
-        int checkLoginRegistry = [UKLoginItemRegistry indexForLoginItemWithPath:[[NSBundle mainBundle] bundlePath]];
-        if ( checkLoginRegistry >= 1 ) {
-            [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:YES]
-                                                     forKey:@"loadOnStartup"];
-        } else {
-            [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:NO]
-                                                     forKey:@"loadOnStartup"];
-        }
+            int checkLoginRegistry = [UKLoginItemRegistry indexForLoginItemWithPath:[[NSBundle mainBundle] bundlePath]];
+            [[NSUserDefaults standardUserDefaults] setBool:(checkLoginRegistry >= 1) forKey:@"loadOnStartup"];
 #endif
-    });
+        });
+    }
     [self registerOrDeregisterICloudSync];
 
     [NSApp activateIgnoringOtherApps: YES];
@@ -719,6 +715,29 @@
 
 -(IBAction)toggleLoadOnStartup:(id)sender {
 	// Since the control in Interface Builder is bound to User Defaults and sends this action, this method is called after User Defaults already reflects the newly-selected state and merely conveys that value to the relevant mechanisms rather than acting to negate the User Defaults state.
+	if (@available(macOS 13.0, *)) {
+        SMAppService *service = [SMAppService mainAppService];
+        BOOL requested = [[NSUserDefaults standardUserDefaults] boolForKey:@"loadOnStartup"];
+        NSError *error = nil;
+        if (requested && service.status == SMAppServiceStatusNotRegistered) {
+            [service registerAndReturnError:&error];
+        } else if (!requested && service.status != SMAppServiceStatusNotRegistered) {
+            [service unregisterAndReturnError:&error];
+        }
+        if (error || service.status == SMAppServiceStatusRequiresApproval) {
+            [[NSUserDefaults standardUserDefaults] setBool:(service.status == SMAppServiceStatusEnabled ||
+                                                           service.status == SMAppServiceStatusRequiresApproval)
+                                                     forKey:@"loadOnStartup"];
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.messageText = @"Flycut could not enable Open at Login";
+            alert.informativeText = error ? [error localizedDescription] : @"Allow Flycut in System Settings > General > Login Items & Extensions.";
+            [alert addButtonWithTitle:@"Open Login Items"];
+            [alert addButtonWithTitle:@"Cancel"];
+            if ([alert runModal] == NSAlertFirstButtonReturn) [SMAppService openSystemSettingsLoginItems];
+            [alert release];
+        }
+        return;
+    }
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"loadOnStartup"] ) {
         // FIXME: Should ask Gennadii if the "#ifdef SANDBOXING" should be removed and replaced with "if ([AppController isAppSandboxed])"
 #ifdef SANDBOXING
@@ -863,12 +882,11 @@
 
 -(void)pollPB:(NSTimer *)timer
 {
-    NSString *type = [jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]];
-    if ( [pbCount intValue] != [jcPasteboard changeCount] && ![flycutOperator storeDisabled] ) {
-        // Reload pbCount with the current changeCount
-        // Probably poor coding technique, but pollPB should be the only thing messing with pbCount, so it should be okay
+    NSInteger changeCount = [jcPasteboard changeCount];
+    if ( [pbCount integerValue] != changeCount && ![flycutOperator storeDisabled] ) {
         [pbCount release];
-        pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
+        pbCount = [[NSNumber numberWithInteger:changeCount] retain];
+        NSString *type = [jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]];
         if ( type != nil ) {
 			NSRunningApplication *currRunningApp = nil;
 			for (NSRunningApplication *currApp in [[NSWorkspace sharedWorkspace] runningApplications])
@@ -880,32 +898,28 @@
 			if (largeCopyRisk)
 				[self toggleMenuIconDisabled];
 
-			// In case we need to do a status visual, this will be dispatched out so our thread isn't blocked.
+			// Pasteboard providers can block while delivering data, so read off the UI thread.
 			dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 			dispatch_async(queue, ^{
-
-				// This operation blocks until the transfer is complete, though it was was here before the RDC issue was discovered.  Convenient.
+                // A later copy may arrive while a provider is still resolving this one.
+                // Never attribute that later content to the earlier change count.
+                if ([jcPasteboard changeCount] != changeCount) {
+                    if (largeCopyRisk) dispatch_async(dispatch_get_main_queue(), ^{ [self toggleMenuIconDisabled]; });
+                    return;
+                }
                 NSString *contents = [jcPasteboard stringForType:type];
+                NSArray *availableTypes = [jcPasteboard types];
 
-				// Toggle back if dealing with the RDC issue.
-				if (largeCopyRisk) {
-					dispatch_async(dispatch_get_main_queue(), ^{
-						[self toggleMenuIconDisabled];
-					});
-				}
-
-				if ( contents == nil || [flycutOperator shouldSkip:contents ofType:[jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]] fromAvailableTypes:[jcPasteboard types]] ) {
-                   DLog(@"Contents: Empty or skipped");
-               } else {
-                   // Dispatch back to main queue to safely modify the clipping store and update UI.
-                   // jcList (NSMutableArray) is not thread-safe, and concurrent access from this
-                   // background queue and the main thread (e.g. showing the bezel) causes crashes.
-                   dispatch_async(dispatch_get_main_queue(), ^{
-                       if ( ! [pbCount isEqualTo:pbBlockCount] ) {
-                           [flycutOperator addClipping:contents ofType:type fromApp:[currRunningApp localizedName] withAppBundleURL:currRunningApp.bundleURL.path target:self clippingAddedSelector:@selector(updateMenu)];
-                       }
-                   });
-               }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (largeCopyRisk) [self toggleMenuIconDisabled];
+                    if ([jcPasteboard changeCount] != changeCount ||
+                        [pbBlockCount integerValue] == changeCount ||
+                        [flycutOperator storeDisabled] || contents == nil) return;
+                    // shouldSkip can modify the clipping store, so it also belongs on main.
+                    if (![flycutOperator shouldSkip:contents ofType:type fromAvailableTypes:availableTypes]) {
+                        [flycutOperator addClipping:contents ofType:type fromApp:[currRunningApp localizedName] withAppBundleURL:currRunningApp.bundleURL.path target:self clippingAddedSelector:@selector(updateMenu)];
+                    }
+                });
             });
         } 
     }
@@ -1352,7 +1366,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
     [jcPasteboard declareTypes:pbTypes owner:NULL];
 	
     [jcPasteboard setString:pbFullText forType:@"NSStringPboardType"];
-    [self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
+    [self setPBBlockCount:[NSNumber numberWithInteger:[jcPasteboard changeCount]]];
 }
 
 -(void) stackDown
