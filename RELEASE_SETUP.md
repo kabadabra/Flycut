@@ -1,6 +1,6 @@
 # Releasing the Flycut fork
 
-The public macOS channel is a Developer ID signed, notarized DMG built by [the release workflow](.github/workflows/release.yml). A tag named `vX.Y.Z` triggers publication. `workflow_dispatch` builds an artifact for testing without publishing a GitHub Release.
+The public macOS channel is a Developer ID signed, notarized DMG built on GitHub's Xcode 27 runner by [the release workflow](.github/workflows/release.yml). The workflow signs both the app and disk image before notarization, then checks the stapled image with Gatekeeper. A tag named `vX.Y.Z` triggers publication. `workflow_dispatch` builds an artifact for testing without publishing a GitHub Release.
 
 ## One-time Apple setup
 
@@ -33,7 +33,7 @@ Do not commit credentials. Tag builds stop before publication if signing or nota
 
 1. Verify the macOS build, the `com.edynamics.flycut` bundle identifier, and Developer ID team `M2L9SL9WCS`.
 2. Update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the macOS Flycut target. Add a matching `## X.Y.Z` section to `CHANGELOG.md`.
-3. Push a `vX.Y.Z` tag from the reviewed commit. The workflow signs nested code, notarizes and staples the DMG, and publishes it on the fork.
+3. Push a `vX.Y.Z` tag from the reviewed commit. The workflow signs nested code and the DMG, notarizes and staples the DMG, and publishes it on the fork.
 4. Download the public DMG and verify it on a separate Mac before telling users to upgrade.
 
 The app can read and save local history without iCloud. CloudKit sync is not configured for the fork, and the original Mac App Store channel is not controlled here. The app's new identifier means existing users can keep the upstream app installed and import their saved preferences into this fork as described in the README.
