@@ -1,12 +1,12 @@
-# Flycut
+# Flycut 2.0
 
-Flycut is a free, open source clipboard manager for macOS. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
+Flycut 2.0 is a free, open source clipboard manager for macOS. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
 
 Copy text as usual. Flycut keeps a history of clippings, which you can open with **Shift-Command-V** or from its menu bar icon. The original iOS source remains in this repository, but the current fork focuses on macOS.
 
 ## macOS support
 
-The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.kabadabra.flycut`, so it can coexist with the original app. Clipboard history and settings use the new ID; see [migration](#moving-from-the-original-flycut).
+The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.kabadabra.flycut`, so it can coexist with the original app. Its display name is Flycut 2.0, while the executable and repository remain Flycut. Clipboard history and settings use the new ID; see [migration](#moving-from-the-original-flycut).
 
 Apple may ask whether Flycut can read the clipboard. Choose **Always Allow** for automatic history capture. Pasting a selected clipping also needs **Accessibility** access in System Settings > Privacy & Security > Accessibility. See the [Mac help](help.md) for troubleshooting.
 

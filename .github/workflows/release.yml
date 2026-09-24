@@ -1,6 +1,6 @@
 name: Build and Release
 
-# Cuts a Flycut release when a version tag (e.g. v1.9.7) is pushed.
+# Cuts a Flycut release when a version tag (e.g. v2.0.0) is pushed.
 #
 # Behaviour degrades gracefully by which secrets are configured:
 #   - No secrets            -> ad-hoc signed .app in the DMG (Gatekeeper will warn; for testing only)
@@ -128,9 +128,9 @@ jobs:
     - name: Create DMG
       run: |
         mkdir -p build/dmg-staging
-        cp -R build/Export/Flycut.app build/dmg-staging/
+        cp -R build/Export/Flycut.app "build/dmg-staging/Flycut 2.0.app"
         ln -s /Applications build/dmg-staging/Applications
-        hdiutil create -volname "Flycut" -srcfolder build/dmg-staging \
+        hdiutil create -volname "Flycut 2.0" -srcfolder build/dmg-staging \
           -ov -format UDZO "$PWD/build/Flycut.dmg"
         ls -lh build/Flycut.dmg
 
@@ -184,7 +184,7 @@ jobs:
           echo "$NOTES"
           echo ""
           echo "## Installation"
-          echo "1. Download the DMG below, open it, and drag Flycut to Applications."
+          echo "1. Download the DMG below, open it, and drag Flycut 2.0 to Applications."
           echo "2. Allow clipboard access when macOS asks so Flycut can record new text."
           echo "3. Grant Accessibility permission for pasting when prompted"
           echo "   (System Settings > Privacy & Security > Accessibility)."

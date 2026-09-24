@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.9.8 (unreleased)
+## 2.0.0 (unreleased)
 
 Fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) for ongoing macOS compatibility. Original Flycut by General Arcade, Gennadiy Potapov, and contributors; based on Jumpcut by Steve Cook.
 
@@ -11,6 +11,7 @@ Fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) for ongoing macOS comp
 - Use modern macOS Login Items registration on macOS 13 and later.
 - Use a separate fork app identity, `com.kabadabra.flycut`, and document migration from the original app.
 - Add QMD and Graphify developer setup and require signing plus notarization for public DMGs.
+- Name this fork Flycut 2.0 while retaining credit for the original project.
 
 ## 1.9.7 (2026-08-04)
 
