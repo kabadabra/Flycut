@@ -29,6 +29,7 @@ jobs:
     env:
       HAS_CERTIFICATES: ${{ secrets.CERTIFICATES_P12 != '' }}
       HAS_NOTARY: ${{ secrets.NOTARY_KEY != '' && secrets.NOTARY_KEY_ID != '' && secrets.NOTARY_ISSUER_ID != '' }}
+      EXPECTED_TEAM_ID: M2L9SL9WCS
 
     steps:
     - name: Checkout code
@@ -123,6 +124,23 @@ jobs:
           echo "::warning::No Developer ID certificate configured - ad-hoc signing (test build only)."
           codesign --force --deep --sign - "$APP"
         fi
+        BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"
+        if [ "$BUNDLE_ID" != 'com.edynamics.flycut' ]; then
+          echo "Unexpected bundle identifier: $BUNDLE_ID" >&2
+          exit 1
+        fi
+        HELPER_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Library/LoginItems/FlycutHelper.app/Contents/Info.plist")"
+        if [ "$HELPER_BUNDLE_ID" != 'com.edynamics.flycut.helper' ]; then
+          echo "Unexpected helper bundle identifier: $HELPER_BUNDLE_ID" >&2
+          exit 1
+        fi
+        if [ -n "$SIGNING_IDENTITY" ]; then
+          TEAM_ID="$(codesign -dv "$APP" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+          if [ "$TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
+            echo "Unexpected signing team: $TEAM_ID" >&2
+            exit 1
+          fi
+        fi
         codesign -dv --verbose=2 "$APP" || true
 
     - name: Create DMG
@@ -188,11 +206,12 @@ jobs:
           echo "2. Allow clipboard access when macOS asks so Flycut can record new text."
           echo "3. Grant Accessibility permission for pasting when prompted"
           echo "   (System Settings > Privacy & Security > Accessibility)."
-          echo "This fork uses its own app identity, com.kabadabra.flycut."
+          echo "This fork uses its own app identity, com.edynamics.flycut."
+          echo "For history and settings migration from earlier Flycut builds, see https://github.com/kabadabra/Flycut#moving-to-flycut-20."
           echo ""
           echo "**Upgrading and paste stopped working?** Reset the permission and re-grant it:"
           echo '```'
-          echo "tccutil reset Accessibility com.kabadabra.flycut"
+          echo "tccutil reset Accessibility com.edynamics.flycut"
           echo '```'
           echo ""
           echo "_Build: $SIGN._"

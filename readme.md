@@ -6,7 +6,7 @@ Copy text as usual. Flycut keeps a history of clippings, which you can open with
 
 ## macOS support
 
-The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.kabadabra.flycut`, so it can coexist with the original app. Its display name is Flycut 2.0, while the executable and repository remain Flycut. Clipboard history and settings use the new ID; see [migration](#moving-from-the-original-flycut).
+The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.edynamics.flycut`, so it can coexist with the original app. Its display name is Flycut 2.0, while the executable and repository remain Flycut. Clipboard history and settings use the new ID; see [migration](#moving-to-flycut-20).
 
 Apple may ask whether Flycut can read the clipboard. Choose **Always Allow** for automatic history capture. Pasting a selected clipping also needs **Accessibility** access in System Settings > Privacy & Security > Accessibility. See the [Mac help](help.md) for troubleshooting.
 
@@ -23,18 +23,27 @@ The local build is ad hoc signed for development. A downloadable DMG should be s
 
 Run the local build with `open build/DerivedData/Build/Products/Debug/Flycut.app`. Install a tagged, notarized DMG for regular use when release credentials are configured.
 
-## Moving from the original Flycut
+## Moving to Flycut 2.0
 
-Quit both Flycut versions before moving preferences. Back up the original domain, then import it into the fork:
+Quit all Flycut versions before moving preferences. If you used the original Flycut, back up its preferences and import them into Flycut 2.0:
 
 ```sh
 defaults export com.generalarcade.flycut "$HOME/Desktop/Flycut-original.plist"
-defaults import com.kabadabra.flycut "$HOME/Desktop/Flycut-original.plist"
-defaults delete com.kabadabra.flycut syncSettingsViaICloud 2>/dev/null || true
-defaults delete com.kabadabra.flycut syncClippingsViaICloud 2>/dev/null || true
+defaults import com.edynamics.flycut "$HOME/Desktop/Flycut-original.plist"
+defaults delete com.edynamics.flycut syncSettingsViaICloud 2>/dev/null || true
+defaults delete com.edynamics.flycut syncClippingsViaICloud 2>/dev/null || true
 ```
 
-The import brings settings and any saved clipping history into the new domain. The original domain remains untouched. Launch the fork afterward and grant its own permissions; macOS treats it as a separate app.
+If you used an earlier build of this fork with the `com.kabadabra.flycut` identity, import that domain instead:
+
+```sh
+defaults export com.kabadabra.flycut "$HOME/Desktop/Flycut-fork-preview.plist"
+defaults import com.edynamics.flycut "$HOME/Desktop/Flycut-fork-preview.plist"
+defaults delete com.edynamics.flycut syncSettingsViaICloud 2>/dev/null || true
+defaults delete com.edynamics.flycut syncClippingsViaICloud 2>/dev/null || true
+```
+
+Choose the source with the history you want to keep; the second import replaces the first. Each source domain remains untouched. Launch Flycut 2.0 afterward and grant its own clipboard and Accessibility permissions, because macOS treats the new identity as a separate app.
 
 ## Development tools
 

@@ -9,7 +9,7 @@ Fork of [TermiT/Flycut](https://github.com/TermiT/Flycut) for ongoing macOS comp
 - Keep the macOS 27 menu bar click fix from upstream.
 - Preserve the existing clipboard at launch and discard stale background reads.
 - Use modern macOS Login Items registration on macOS 13 and later.
-- Use a separate fork app identity, `com.kabadabra.flycut`, and document migration from the original app.
+- Use the `com.edynamics.flycut` app identity under Christopher Jacoby's Apple Developer team, with migration from the original app and earlier fork builds.
 - Add QMD and Graphify developer setup and require signing plus notarization for public DMGs.
 - Name this fork Flycut 2.0 while retaining credit for the original project.
 - Cache bezel backgrounds and release temporary Core Graphics colors (adapted from [upstream PR #327](https://github.com/TermiT/Flycut/pull/327) by Emanuel Stadler).

@@ -4,7 +4,7 @@ The public macOS channel is a Developer ID signed, notarized DMG built by [the r
 
 ## One-time Apple setup
 
-Use **your own** Apple Developer team and a Developer ID Application certificate. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
+Use the Developer ID Application certificate for **Christopher Jacoby (team `M2L9SL9WCS`)**. The app and helper use `com.edynamics.flycut` and `com.edynamics.flycut.helper`. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
 
 In the fork's GitHub repository, add these Actions secrets:
 
@@ -31,7 +31,7 @@ Do not commit credentials. Tag builds stop before publication if signing or nota
 
 ## Cut a release
 
-1. Verify the macOS build and the `com.kabadabra.flycut` bundle identifier.
+1. Verify the macOS build, the `com.edynamics.flycut` bundle identifier, and Developer ID team `M2L9SL9WCS`.
 2. Update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the macOS Flycut target. Add a matching `## X.Y.Z` section to `CHANGELOG.md`.
 3. Push a `vX.Y.Z` tag from the reviewed commit. The workflow signs nested code, notarizes and staples the DMG, and publishes it on the fork.
 4. Download the public DMG and verify it on a separate Mac before telling users to upgrade.
