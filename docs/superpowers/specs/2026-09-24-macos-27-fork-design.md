@@ -16,7 +16,7 @@ Keep Flycut's familiar menu bar, Shift-Command-V, and text clipping workflow wor
 
 ## Approach
 
-Keep the Objective-C/AppKit UI for this release. Adjust the macOS deployment target to 12.0, fix capture at its source, adopt `SMAppService.mainAppService` on macOS 13+, and retain the older login path for macOS 12. Use a distinct fork bundle identifier, `com.kabadabra.flycut`, so the fork can coexist with upstream. Ship direct downloads first; do not promise working CloudKit sync or Mac App Store distribution under upstream's entitlements. Document an opt-in local preferences migration for existing users.
+Keep the Objective-C/AppKit UI for this release. Adjust the macOS deployment target to 12.0, fix capture at its source, adopt `SMAppService.mainAppService` on macOS 13+, and retain the older login path for macOS 12. Use a distinct fork bundle identifier, `com.edynamics.flycut`, so the fork can coexist with upstream. The earlier preview used `com.kabadabra.flycut`. Ship direct downloads first; do not promise working CloudKit sync or Mac App Store distribution under upstream's entitlements. Document an opt-in local preferences migration for existing users.
 
 Set up QMD to index project Markdown and Graphify to map the code. Keep generated indexes and graph output out of Git; commit only reproducible setup instructions. Preserve upstream as a fetchable remote and give original authors credit in the README, license, and release notes.
 
