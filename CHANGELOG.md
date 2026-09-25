@@ -24,7 +24,14 @@ Flycut 2.0 is the first Emerging Dynamics release of Flycut, the free, open-sour
 
 ### Credits
 
-Flycut 2.0 is a fork of [TermiT/Flycut](https://github.com/TermiT/Flycut). Original Flycut was created by General Arcade, Gennadiy Potapov, and contributors, and is based on Jumpcut by Steve Cook. The clipping panel improvement adapts [upstream PR #327](https://github.com/TermiT/Flycut/pull/327) by Emanuel Stadler.
+Flycut 2.0 is a fork of [TermiT/Flycut](https://github.com/TermiT/Flycut). Original Flycut was created by General Arcade, Gennadiy Potapov, and contributors, and is based on Jumpcut by Steve Cook.
+
+### Thank you to contributors
+
+- [Emanuel Stadler (@emanuelst)](https://github.com/emanuelst) for the [macOS 27 menu bar fix](https://github.com/TermiT/Flycut/pull/328), merged upstream, and the [bezel rendering improvements](https://github.com/TermiT/Flycut/pull/327), adapted in [our PR #3](https://github.com/kabadabra/Flycut/pull/3).
+- [Ilya Bersenev (@voidless)](https://github.com/voidless) for the [keyboard layout paste fix](https://github.com/TermiT/Flycut/pull/314) inherited from upstream.
+- [Tyler Martin (@tymrtn)](https://github.com/tymrtn) for the [CloudKit startup fix](https://github.com/TermiT/Flycut/pull/322) inherited from upstream.
+- [@agentheath](https://github.com/agentheath) for the [macOS 26 menu bar crash fix](https://github.com/TermiT/Flycut/pull/323) inherited from upstream.
 
 ## 1.9.7 (2026-08-04)
 
