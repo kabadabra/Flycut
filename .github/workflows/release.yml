@@ -200,7 +200,8 @@ jobs:
           NOTES="$(awk -v v="$VERSION" '
             $0 ~ "^## " && $0 ~ v {grab=1; next}
             grab && /^## / {exit}
-            grab {print}' CHANGELOG.md)"
+            grab && !started && $0 == "" {next}
+            grab {started=1; print}' CHANGELOG.md)"
         fi
         if [ -z "$NOTES" ]; then
           PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')"
@@ -217,12 +218,12 @@ jobs:
           echo "$NOTES"
           echo ""
           echo "## Installation"
-          echo "1. Download the DMG below, open it, and drag Flycut 2.0 to Applications."
+          echo ""
+          echo "1. Download **Flycut.dmg** below, open it, and drag **Flycut 2.0** to Applications."
           echo "2. Allow clipboard access when macOS asks so Flycut can record new text."
-          echo "3. Grant Accessibility permission for pasting when prompted"
-          echo "   (System Settings > Privacy & Security > Accessibility)."
-          echo "This fork uses its own app identity, com.edynamics.flycut."
-          echo "For history and settings migration from earlier Flycut builds, see https://github.com/kabadabra/Flycut#moving-to-flycut-20."
+          echo "3. Grant Accessibility access for pasting in System Settings > Privacy & Security > Accessibility."
+          echo ""
+          echo "Flycut 2.0 uses its own app identity. To bring over history and settings, follow the [migration guide](https://github.com/kabadabra/Flycut#moving-to-flycut-20)."
           echo ""
           echo "**Upgrading and paste stopped working?** Reset the permission and re-grant it:"
           echo '```'

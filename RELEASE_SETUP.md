@@ -4,7 +4,7 @@ The public macOS channel is a Developer ID signed, notarized DMG built on GitHub
 
 ## One-time Apple setup
 
-Use the Developer ID Application certificate for **Christopher Jacoby (team `M2L9SL9WCS`)**. The app and helper use `com.edynamics.flycut` and `com.edynamics.flycut.helper`. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
+Use the Developer ID Application certificate for the Emerging Dynamics signing team (`M2L9SL9WCS`). The app and helper use `com.edynamics.flycut` and `com.edynamics.flycut.helper`. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
 
 In the fork's GitHub repository, add these Actions secrets:
 

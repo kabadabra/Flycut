@@ -1,6 +1,6 @@
 # Flycut 2.0
 
-Flycut 2.0 is a free, open source clipboard manager for macOS. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
+Flycut 2.0 is a free, open source clipboard manager for macOS, maintained by Emerging Dynamics. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
 
 Download the [latest signed and notarized Flycut 2.0 DMG](https://github.com/kabadabra/Flycut/releases/latest).
 
