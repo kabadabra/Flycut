@@ -4,6 +4,11 @@ public enum FlycutVersion {
     public static let current = "3.0.0"
 }
 
+public enum CollectionKind: String, Codable, Sendable {
+    case recent
+    case favorite
+}
+
 public struct Clip: Codable, Equatable, Sendable {
     public let id: UUID
     public let text: String
@@ -11,6 +16,8 @@ public struct Clip: Codable, Equatable, Sendable {
     public let sourceAppName: String?
     public let sourceBundleURL: String?
     public let capturedAt: Date?
+    public let collection: CollectionKind
+    public let order: Int
 
     public init(
         id: UUID,
@@ -18,7 +25,9 @@ public struct Clip: Codable, Equatable, Sendable {
         pasteboardType: String,
         sourceAppName: String?,
         sourceBundleURL: String?,
-        capturedAt: Date?
+        capturedAt: Date?,
+        collection: CollectionKind,
+        order: Int
     ) {
         self.id = id
         self.text = text
@@ -26,5 +35,7 @@ public struct Clip: Codable, Equatable, Sendable {
         self.sourceAppName = sourceAppName
         self.sourceBundleURL = sourceBundleURL
         self.capturedAt = capturedAt
+        self.collection = collection
+        self.order = order
     }
 }
