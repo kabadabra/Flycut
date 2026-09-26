@@ -1,29 +1,38 @@
-# Flycut 2.0
+# Flycut 3.0
 
-Flycut 2.0 is a free, open source clipboard manager for macOS, maintained by Emerging Dynamics. This repository is a [fork of the original Flycut project](https://github.com/TermiT/Flycut), created for ongoing macOS compatibility work. Flycut itself is based on [Jumpcut](http://jumpcut.sourceforge.net/). The original authors and contributors retain credit in [the MIT license](license.txt) and [acknowledgements](acknowledgements.txt).
+Flycut is a free, open source clipboard manager for macOS, maintained by Emerging Dynamics. This repository is a [fork of TermiT/Flycut](https://github.com/TermiT/Flycut), based on [Jumpcut](http://jumpcut.sourceforge.net/). It retains the [MIT license](license.txt) and [original acknowledgements](acknowledgements.txt).
 
-Download the [latest signed and notarized Flycut 2.0 DMG](https://github.com/kabadabra/Flycut/releases/latest).
+Flycut 3.0 is the Swift rewrite under release review. Its public release is gated on migration, UI, paste, and signed installation checks. The [published Flycut 2.0 release](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0) remains available, including for macOS 12 users.
 
-Copy text as usual. Flycut keeps a history of clippings, which you can open with **Shift-Command-V** or from its menu bar icon. The original iOS source remains in this repository, but the current fork focuses on macOS.
+## Using Flycut
 
-## macOS support
+Copy text normally, then open the searchable palette from the menu bar or **Shift-Command-V**. Switch between recent clips and favorites, pause capture, copy or paste a selection, export text, or adjust the grouped settings. Keyboard help is available in the palette: arrows and j/k, Home/End, Page Up/Down, digits, Return to paste, Escape to dismiss, Delete, f/F favorites actions, and s/S export. Letter shortcuts do not interfere with typing in search.
 
-The macOS app builds with Xcode 27 and targets macOS 12 or newer. The macOS 27 menu bar click fix from upstream is included. The fork has its own bundle ID, `com.edynamics.flycut`, so it can coexist with the original app. Its display name is Flycut 2.0, while the executable and repository remain Flycut. Clipboard history and settings use the new ID; see [migration](#moving-to-flycut-20).
-
-Apple may ask whether Flycut can read the clipboard. Choose **Always Allow** for automatic history capture. Pasting a selected clipping also needs **Accessibility** access in System Settings > Privacy & Security > Accessibility. See the [Mac help](help.md) for troubleshooting.
+Flycut 3.0 requires **macOS 13 or later**. It stores local history; **iCloud/CloudKit sync is not configured or available**. Allow clipboard access when macOS asks. Pasting into another app requires Accessibility permission in System Settings > Privacy & Security > Accessibility. Without that permission, you can still copy a clip and paste it yourself.
 
 ## Build locally
 
-Open `Flycut.xcodeproj` in Xcode 27 and select the **Flycut** macOS scheme, or run:
+Use Xcode 27.0 (Swift 6.4, Swift 6 language mode). Open `Package.swift` in Xcode or run:
 
 ```sh
-xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Debug \
-  -destination 'platform=macOS' -derivedDataPath build/DerivedData build
+swift test
+scripts/build-app.sh debug
+open 'build/Preview/Flycut Preview.app'
+scripts/build-app.sh release
+scripts/verify-app.sh build/Export/Flycut.app
 ```
 
-The local build is ad hoc signed for development. A downloadable DMG should be signed and notarized with your own Apple Developer credentials; see [release setup](RELEASE_SETUP.md). iCloud sync is not provisioned for this fork, so use local history persistence. The original Flycut App Store listing is maintained by the original project, not this fork.
+The preview has a separate `com.edynamics.flycut.preview` identity and data. Local bundles are ad hoc signed. The production bundle is `build/Export/Flycut.app`, identity `com.edynamics.flycut`, version `3.0.0`. Opening it can start production migration; use the preview for routine development. See [developer notes](docs/DEVELOPING.md) and [release setup](RELEASE_SETUP.md).
 
-Run the local build with `open build/DerivedData/Build/Products/Debug/Flycut.app`. Install a tagged, notarized DMG for regular use when release credentials are configured.
+## Moving to Flycut 3.0
+
+1. Quit every Flycut instance. Keep the old app and saved preferences until you have checked the import. If history was never saved, export any clippings you need before quitting the old version.
+2. Install the reviewed, signed `Flycut.app` from its DMG. Launch **/Applications/Flycut.app** explicitly by path so macOS does not choose the old `Flycut 2.0.app`.
+3. Review the migration preview: choose the current fork, an earlier `com.kabadabra.flycut` source, original sandboxed Flycut, or a selected `.plist`. If container access is denied, use the file picker. Choose one source; imports are not silently combined.
+4. Check counts, unsupported settings, malformed entries, and the proposed destination. Existing destination data requires a merge or replace choice and a destination backup. The importer copies the source to a private backup and leaves the source untouched. Reimporting the same source is idempotent. Imported history can raise capacity so records are not trimmed. A legacy “never save” setting keeps imported clips in memory unless you explicitly change the save mode.
+5. Verify recent clips, favorites, settings, and paste behavior. Keep the backup for recovery. **Only then remove the old Flycut 2.0.app**: both versions use `com.edynamics.flycut` and should not remain installed together. Disable any old login registration and set Open at Login in the new app as needed. Recheck Accessibility permission for the new app.
+
+The original upstream app uses a different identity, but running multiple clipboard managers during migration can confuse capture and paste behavior. Imported cloud flags never enable sync.
 
 ## Moving to Flycut 2.0
 
@@ -47,7 +56,7 @@ Choose the source with the history you want to keep; a second import replaces th
 
 ## Development tools
 
-QMD indexes this project's Markdown as the `flycut` collection. Graphify generates a local code graph. Both tools are optional for building Flycut; [developer notes](docs/DEVELOPING.md) show setup and refresh commands. The graph and search index are local artifacts, not part of the release.
+QMD and Graphify are optional local navigation tools. See [developer notes](docs/DEVELOPING.md). Generated indexes and graphs are not release assets. Legacy Objective-C and dormant iOS sources remain for history and review, outside the active Swift package.
 
 ## Credits and license
 

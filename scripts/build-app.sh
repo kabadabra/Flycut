@@ -22,6 +22,12 @@ else
     destination="$root/build/Export/$app_name.app"
 fi
 
+version=${VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' App/AppInfo.plist)}
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Version must have the form X.Y.Z" >&2
+    exit 2
+fi
+
 swift build -c "$configuration" --product FlycutMac
 binary_dir=$(swift build -c "$configuration" --show-bin-path)
 
@@ -35,6 +41,8 @@ install -m 644 "$root/App/AppInfo.plist" "$app/Contents/Info.plist"
 install -m 644 "$root/flycut.icns" "$app/Contents/Resources/flycut.icns"
 
 plist=/usr/libexec/PlistBuddy
+"$plist" -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+"$plist" -c "Set :CFBundleVersion $version" "$app/Contents/Info.plist"
 "$plist" -c "Set :CFBundleIdentifier $bundle_id" "$app/Contents/Info.plist"
 "$plist" -c "Set :CFBundleName $app_name" "$app/Contents/Info.plist"
 "$plist" -c "Set :CFBundleDisplayName $app_name" "$app/Contents/Info.plist"

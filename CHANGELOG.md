@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.0 (unreleased)
+
+The Swift rewrite of Flycut, maintained by Emerging Dynamics, remains free and MIT licensed. Requires macOS 13 or later. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
+
+- New searchable SwiftUI palette with an AppKit menu bar and configurable Shift-Command-V shortcut, recent and favorite collections, keyboard help, copy/paste, pause, export, and grouped settings.
+- Swift 6 core, private SQLite history, capture and paste guards, and modern Login Items support.
+- Previewed legacy migration with source backups, explicit destination conflict handling, preserved clipping order and metadata, and privacy-preserving save modes. iCloud sync is unavailable; imported cloud flags never enable it.
+- Production app is Flycut.app (`com.edynamics.flycut`); development preview has separate data. Public builds require Developer ID signing, hardened runtime, notarization and stapling of both app and DMG.
+
+Before upgrading, quit Flycut 2.0, launch the new app explicitly, review migration, and verify your history before removing Flycut 2.0.app. Both share an identity. Read the [migration guide](readme.md#moving-to-flycut-30). Publication awaits UI, migration and signed installation review.
+
+### Credits
+
+Flycut is a fork of [TermiT/Flycut](https://github.com/TermiT/Flycut). Original Flycut was created by General Arcade, Gennadiy Potapov, and contributors, and is based on Jumpcut by Steve Cook.
+
+### Thank you to contributors
+
+- [Emanuel Stadler (@emanuelst)](https://github.com/emanuelst) for the [macOS 27 menu bar fix](https://github.com/TermiT/Flycut/pull/328), merged upstream, and the [bezel rendering improvements](https://github.com/TermiT/Flycut/pull/327), adapted in [our PR #3](https://github.com/kabadabra/Flycut/pull/3).
+- [Ilya Bersenev (@voidless)](https://github.com/voidless) for the [keyboard layout paste fix](https://github.com/TermiT/Flycut/pull/314) inherited from upstream.
+- [Tyler Martin (@tymrtn)](https://github.com/tymrtn) for the [CloudKit startup fix](https://github.com/TermiT/Flycut/pull/322) inherited from upstream.
+- [@agentheath](https://github.com/agentheath) for the [macOS 26 menu bar crash fix](https://github.com/TermiT/Flycut/pull/323) inherited from upstream.
+
 ## 2.0.0 (2026-09-24)
 
 Flycut 2.0 is the first Emerging Dynamics release of Flycut, the free, open-source clipboard manager for macOS.
