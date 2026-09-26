@@ -47,14 +47,11 @@ struct PaletteView: View {
                         }
                         ForEach(model.visibleClips, id: \.id) { clip in
                             PaletteRow(clip: clip, selected: clip.id == model.selection.selectedID,
-                                       showSource: model.showSource, showType: model.showTypes, previewLength: model.previewLength)
-                            .contentShape(Rectangle())
-                            .overlay {
-                                ImmediateRowClickSurface { count in
-                                    searching = false
-                                    model.handleRowClick(clip.id, clickCount: count)
-                                }
+                                       showSource: model.showSource, showType: model.showTypes, previewLength: model.previewLength) { count in
+                                searching = false
+                                model.handleRowClick(clip.id, clickCount: count)
                             }
+                            .contentShape(Rectangle())
                             .accessibilityAction(named: "Activate Clipping") { model.selection.select(clip.id); model.activateSelection() }
                             .contextMenu {
                                 Button("Move to Favorites") { model.selection.select(clip.id); model.perform(.favorite) }

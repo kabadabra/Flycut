@@ -7,16 +7,26 @@ struct PaletteRow: View {
     let showSource: Bool
     let showType: Bool
     let previewLength: Int
+    let onClick: (Int) -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(String(clip.text.prefix(previewLength))).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-            if showType { Text("Type: \(clip.pasteboardType)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-            if showSource {
-                Text(clip.sourceAppName ?? "Unknown source")
-                    .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(clip.text.prefix(previewLength))).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                if showSource {
+                    Text(clip.sourceAppName ?? "Unknown source")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .overlay { ImmediateRowClickSurface(onClick: onClick) }
+            if showType {
+                Text("Type: \(clip.pasteboardType)").font(.caption).foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 8).padding(.bottom, 5)
             }
         }
-        .padding(.horizontal, 8).padding(.vertical, 5)
         .background(selected ? Color.accentColor.opacity(0.18) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
