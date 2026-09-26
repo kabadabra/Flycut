@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "FlycutMac", targets: ["FlycutMac"]),
     ],
     targets: [
-        .target(name: "FlycutCore"),
+        .target(name: "FlycutCore", linkerSettings: [.linkedLibrary("sqlite3")]),
         .target(
             name: "FlycutPlatform",
             dependencies: ["FlycutCore"],
