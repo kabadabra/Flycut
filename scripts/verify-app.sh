@@ -1,7 +1,7 @@
 #!/bin/bash
 # Local bundles may be ad hoc signed. Release checks opt into Developer ID/notary.
 set -euo pipefail
-[[ $# == 1 ]] || { echo "Usage: $0 path/to/Flycut.app" >&2; exit 2; }
+[[ $# == 1 ]] || { echo "Usage: $0 path/to/Flycut Evolution.app" >&2; exit 2; }
 app=$1
 plist="$app/Contents/Info.plist"
 read_plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
@@ -13,7 +13,8 @@ expect "$(read_plist CFBundleShortVersionString)" "$expected_version" version
 expect "$(read_plist CFBundleVersion)" "$expected_version" 'build version'
 expect "$(read_plist CFBundleExecutable)" FlycutMac executable
 expect "$(read_plist LSMinimumSystemVersion)" 13.0 'minimum macOS'
-expect "$(read_plist CFBundleName)" Flycut 'app name'
+expect "$(read_plist CFBundleName)" 'Flycut Evolution' 'app name'
+expect "$(read_plist CFBundleDisplayName)" 'Flycut Evolution' 'display name'
 [[ -x "$app/Contents/MacOS/FlycutMac" && -f "$app/Contents/Resources/flycut.icns" ]]
 for required_arch in arm64 x86_64; do
     lipo "$app/Contents/MacOS/FlycutMac" -verify_arch "$required_arch"
@@ -30,4 +31,4 @@ if [[ ${REQUIRE_NOTARIZATION:-0} == 1 ]]; then
     xcrun stapler validate "$app"
     spctl --assess --type execute --verbose=2 "$app"
 fi
-echo "Verified Flycut $expected_version: $app"
+echo "Verified Flycut Evolution $expected_version: $app"

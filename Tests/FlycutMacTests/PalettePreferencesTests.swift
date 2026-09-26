@@ -21,18 +21,17 @@ import FlycutCore
         XCTAssertEqual(model.visibleClips.count, 5)
         XCTAssertEqual(model.selection.clips.count, 5)
     }
-    func testRowActivationHonorsCopyPreferenceAndDoesNotChangeExplicitPaste() {
+    func testRowActivationIgnoresLegacyCopyPreference() {
         let model = PaletteModel()
-        var copied = 0; var actions: [PaletteCommand] = []
-        model.copy = { copied += 1 }; model.perform = { actions.append($0) }
+        let clip = Clip(id: UUID(), text: "Synthetic", pasteboardType: "public.utf8-plain-text", sourceAppName: nil, sourceBundleURL: nil, capturedAt: nil, collection: .recent, order: 0)
+        model.selection.update(.init(recent: [clip], favorites: []))
+        var actions: [PaletteCommand] = []; model.perform = { actions.append($0) }
         var settings = FlycutSettings(); settings.menuSelectionPastes = false
         model.apply(settings); model.activateSelection()
-        XCTAssertEqual(copied, 1); XCTAssertTrue(actions.isEmpty)
-        model.perform(.paste)
-        XCTAssertEqual(actions, [.paste])
+        XCTAssertEqual(actions, [.activate])
         settings.menuSelectionPastes = true
         model.apply(settings); model.activateSelection()
-        XCTAssertEqual(copied, 1); XCTAssertEqual(actions, [.paste, .paste])
+        XCTAssertEqual(actions, [.activate, .activate])
     }
     func testSuppressionKeepsFallbackAndPermissionLinkAndAlertOccursOnce() {
         let model = PaletteModel()
@@ -49,6 +48,7 @@ import FlycutCore
         XCTAssertTrue(model.needsAccessibility)
     }
     func testPresentationBoundsRespectUsableMinimumAndSmallScreens() {
+        XCTAssertEqual(PalettePresentation.size(FlycutSettings(), available: NSSize(width: 1400, height: 900)), NSSize(width: 460, height: 700))
         var settings = FlycutSettings(); settings.bezelWidth = 200; settings.bezelHeight = 160
         XCTAssertEqual(PalettePresentation.size(settings, available: NSSize(width: 1400, height: 900)), NSSize(width: 460, height: 400))
         settings.bezelWidth = 1600; settings.bezelHeight = 1200

@@ -82,11 +82,10 @@ struct SettingsView: View {
             ShortcutRecorder(hotkey: $model.value.hotkey)
                 .frame(height: 36)
             Button("Reset to Shift–Command–V") { model.value.hotkey = FlycutSettings().hotkey }
-            Toggle("Double-click a clipping to paste (off: copy)", isOn: $model.value.menuSelectionPastes)
-            Text("Single-click selects. Return and the Paste button always paste; Copy always copies.").font(.caption)
+            Text("Single-click selects. Double-click or press Return to copy and paste when an editable field is focused.").font(.caption)
             Toggle("Keep palette open after copy or paste", isOn: $model.value.stickyPalette)
             Toggle("Wrap selection at first and last clipping", isOn: $model.value.wraparoundPalette)
-            Text("In the palette: arrows or j/k select, Return pastes, Escape closes, f favorites, F switches lists, s exports, S exports the list. Type in search to filter.").font(.callout)
+            Text("In the palette: arrows or j/k select, Return activates, Escape closes, f favorites, F switches lists, s exports, S exports the list. Type in search to filter.").font(.callout)
         }.padding()
     }
     private var privacy: some View {
@@ -111,7 +110,7 @@ struct SettingsView: View {
             Picker("Menu bar icon", selection: $model.value.menuIcon) {
                 Text("Clipboard").tag(0); Text("Scissors").tag(1); Text("Text").tag(2)
             }
-            Toggle("Show clipping source and date", isOn: $model.value.displayClippingSource)
+            Toggle("Show clipping source", isOn: $model.value.displayClippingSource)
             Stepper("Initial preview rows: \(model.value.menuPreviewCount)", value: $model.value.menuPreviewCount, in: 1...1000)
             Text("Show All, search and keyboard navigation reach the full history.").font(.caption)
             Stepper("Preview characters: \(model.value.previewCharacterCount)", value: $model.value.previewCharacterCount, in: 1...1000)

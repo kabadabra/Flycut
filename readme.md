@@ -1,14 +1,14 @@
-# Flycut 3.0
+# Flycut Evolution
 
 Flycut is a free, open source clipboard manager for macOS, maintained by Emerging Dynamics. This repository is a [fork of TermiT/Flycut](https://github.com/TermiT/Flycut), based on [Jumpcut](http://jumpcut.sourceforge.net/). It retains the [MIT license](license.txt) and [original acknowledgements](acknowledgements.txt).
 
-Flycut 3.0 is the Swift rewrite under release review. Its public release is gated on migration, UI, paste, and signed installation checks. The [published Flycut 2.0 release](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0) remains available, including for macOS 12 users.
+Flycut Evolution is the Swift rewrite under release review (version 3.0.0). Its public release is gated on migration, UI, paste, and signed installation checks. The [published Flycut 2.0 release](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0) remains available, including for macOS 12 users.
 
 ## Using Flycut
 
-Copy text normally, then open the searchable palette from the menu bar or **Shift-Command-V**. Switch between recent clips and favorites, pause capture, copy or paste a selection, export text, or adjust the grouped settings. Keyboard help is available in the palette: arrows and j/k, Home/End, Page Up/Down, digits, Return to paste, Escape to dismiss, Delete, f/F favorites actions, and s/S export. Letter shortcuts do not interfere with typing in search.
+Copy text normally, then open the searchable palette from the menu bar or **Shift-Command-V**. Single-click a clipping to select it; double-click or press Return to copy it and paste into the previously focused editable field. If there is no editable field, Flycut leaves it on the clipboard. Switch between recent clips and favorites, pause capture, export text, or adjust the grouped settings. Keyboard help is available in the palette. Letter shortcuts do not interfere with typing in search.
 
-Flycut 3.0 requires **macOS 13 or later**, on Apple Silicon or Intel. Release bundles contain both architectures. It stores local history; **iCloud/CloudKit sync is not configured or available**. Allow clipboard access when macOS asks. Pasting into another app requires Accessibility permission in System Settings > Privacy & Security > Accessibility. Without that permission, you can still copy a clip and paste it yourself.
+Flycut Evolution requires **macOS 13 or later**, on Apple Silicon or Intel. Release bundles contain both architectures. It stores local history; **iCloud/CloudKit sync is not configured or available**. Allow clipboard access when macOS asks. Pasting into another app requires Accessibility permission in System Settings > Privacy & Security > Accessibility. Without that permission, activation still copies the clip so you can paste it yourself.
 
 ## Build locally
 
@@ -17,17 +17,17 @@ Use Xcode 27.0 (Swift 6.4, Swift 6 language mode). Open `Package.swift` in Xcode
 ```sh
 swift test
 scripts/build-app.sh debug
-open 'build/Preview/Flycut Preview.app'
+open 'build/Preview/Flycut Evolution Preview.app'
 scripts/build-app.sh release
-scripts/verify-app.sh build/Export/Flycut.app
+scripts/verify-app.sh 'build/Export/Flycut Evolution.app'
 ```
 
-The preview has a separate `com.edynamics.flycut.preview` identity and data. Local bundles are ad hoc signed. The production bundle is `build/Export/Flycut.app`, identity `com.edynamics.flycut`, version `3.0.0`. Opening it can start production migration; use the preview for routine development. See [developer notes](docs/DEVELOPING.md) and [release setup](RELEASE_SETUP.md).
+The preview has a separate `com.edynamics.flycut.preview` identity and data. Local bundles are ad hoc signed. The production bundle is `build/Export/Flycut Evolution.app`, identity `com.edynamics.flycut`, version `3.0.0`. Opening it can start production migration; use the preview for routine development. See [developer notes](docs/DEVELOPING.md) and [release setup](RELEASE_SETUP.md).
 
-## Moving to Flycut 3.0
+## Moving to Flycut Evolution
 
 1. Quit every Flycut instance. Keep the old app and saved preferences until you have checked the import. If history was never saved, export any clippings you need before quitting the old version.
-2. Install the reviewed, signed `Flycut.app` from its DMG. Launch **/Applications/Flycut.app** explicitly by path so macOS does not choose the old `Flycut 2.0.app`.
+2. Install the reviewed, signed `Flycut Evolution.app` from its DMG. Launch **/Applications/Flycut Evolution.app** explicitly by path so macOS does not choose the old `Flycut 2.0.app`.
 3. Review the migration preview: choose the current fork, an earlier `com.kabadabra.flycut` source, original sandboxed Flycut, or a selected `.plist`. If container access is denied, use the file picker. Choose one source; imports are not silently combined.
 4. Check counts, unsupported settings, malformed entries, and the proposed destination. Existing destination data requires a merge or replace choice and a destination backup. The importer copies the source to a private backup and leaves the source untouched. Reimporting the same source is idempotent. Imported history can raise capacity so records are not trimmed. A legacy “never save” setting keeps imported clips in memory unless you explicitly change the save mode.
 5. Verify recent clips, favorites, settings, and paste behavior. Keep the backup for recovery. **Only then remove the old Flycut 2.0.app**: both versions use `com.edynamics.flycut` and should not remain installed together. Disable any old login registration and set Open at Login in the new app as needed. Recheck Accessibility permission for the new app.

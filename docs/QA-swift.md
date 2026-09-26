@@ -185,3 +185,13 @@ A synthetic copy from a disposable TextEdit document increased the in-memory cou
 After another normal quit, SQLite still contained exactly 50 recents, no synthetic test row, and passed integrity check. Relaunch again showed 50 clippings without migration onboarding. Open at Login and the restored capacity 50 persisted.
 
 From the full-screen TextEdit test Space, Shift–Command–V opened Flycut History with search focused. The full-screen Space was then exited. A real authorized paste still awaits Accessibility permission and a dedicated target check. Status-item click/anchor, VoiceOver and non-QWERTY physical layout remain unverified by the available UI tooling; do not mark those checks passed based on the hotkey or unit tests alone. The old app has not yet been removed, and the public 3.0 release remains unpublished.
+
+## Flycut Evolution interaction pass (2026-09-26)
+
+The earlier Flycut 3.0 row-action description above is superseded by this pass. Flycut Evolution retains technical version 3.0.0 and `com.edynamics.flycut`.
+
+- Swift tests passed after adding activation, editable-focus, and one-time palette-size migration cases. The universal arm64/x86_64 release build passed local bundle verification with the `Flycut Evolution.app` display name.
+- A disposable ad hoc signed bundle, `com.edynamics.flycut.evolutionqa`, was launched with capture paused and 15 synthetic rows in its isolated database. No production history was printed to the test log. The palette measured 460 × 700 points, showed ten compact rows at once, retained source-app labels, and showed no relative time.
+- A single click selected the synthetic third row without activating it. A double-click selected and activated the fourth row. Since the disposable app has no Accessibility grant, Flycut copied the row and showed the existing one-time permission reminder. The alert was dismissed and the test app quit normally.
+- The new `PasteService` tests confirm that editable focus permits one paste event, while a noneditable or changed focus leaves the clipping copied with no paste event. The disposable UI pass could not verify a real automatic paste without an Accessibility grant to the new signed app.
+- Existing signed `~/Applications/Flycut.app` still runs the previous candidate. The new named bundle has not been installed or signed with Developer ID at this checkpoint.

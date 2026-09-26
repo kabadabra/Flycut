@@ -42,8 +42,8 @@ public struct FlycutSettings: Codable, Equatable, Sendable {
     public var wraparoundPalette = false
     public var openAtLogin = false
     public var menuSelectionPastes = true
-    public var bezelWidth = 500.0
-    public var bezelHeight = 320.0
+    public var bezelWidth = 460.0
+    public var bezelHeight = 700.0
     public var popUpAnimation = false
     public var displayClippingSource = true
     public var saveForgottenClippings = false
@@ -64,8 +64,8 @@ public struct FlycutSettings: Codable, Equatable, Sendable {
             hotkey = FlycutHotkey(keyCode: 9, modifierFlags: 1_179_648)
         }
         bezelAlpha = bezelAlpha.isFinite ? min(max(bezelAlpha, 0), 1) : 0.25
-        bezelWidth = bezelWidth.isFinite ? min(max(bezelWidth, 200), 1600) : 500
-        bezelHeight = bezelHeight.isFinite ? min(max(bezelHeight, 160), 1200) : 320
+        bezelWidth = bezelWidth.isFinite ? min(max(bezelWidth, 200), 1600) : 460
+        bezelHeight = bezelHeight.isFinite ? min(max(bezelHeight, 160), 1200) : 700
         skippedPasswordLengths = skippedPasswordLengths.filter { $0 > 0 }
         if menuIcon < 0 || menuIcon > 2 { menuIcon = 0 }
         if let url = saveToLocation, !url.isFileURL || url.absoluteString.utf8.count > 4096 { saveToLocation = nil }

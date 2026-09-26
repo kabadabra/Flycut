@@ -21,7 +21,7 @@ enum PalettePresentation {
 @MainActor final class MenuBarController: NSObject {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     let popover = NSPopover()
-    let panel = PalettePanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 500), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+    let panel = PalettePanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 700), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
     var willPresent: () -> Void = {}
     var didDismiss: () -> Void = {}
     private var settings = FlycutSettings()
@@ -32,12 +32,12 @@ enum PalettePresentation {
         item.button?.target = self
         item.button?.action = #selector(toggle)
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 520, height: 500)
+        popover.contentSize = NSSize(width: 460, height: 700)
         popover.contentViewController = NSHostingController(rootView: PaletteView(model: model))
         panel.contentViewController = NSHostingController(rootView: PaletteView(model: model))
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.title = "Flycut History"
+        panel.title = "Flycut Evolution"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false

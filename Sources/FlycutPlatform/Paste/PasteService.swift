@@ -2,7 +2,7 @@ import AppKit
 
 public enum PasteMode: Sendable { case copy, paste }
 public enum PasteResult: Equatable, Sendable {
-    case copied, pasted, copiedNeedsAccessibility, copiedPasteUnavailable, writeFailed
+    case copied, pasted, copiedNeedsAccessibility, copiedNoEditableTarget, copiedPasteUnavailable, writeFailed
 }
 
 /// All system effects are injected. A successful write returns the final change count.
@@ -13,15 +13,17 @@ public enum PasteResult: Equatable, Sendable {
     public var activate: (pid_t) -> Bool
     public var waitForFocus: () async -> Void
     public var isFrontmost: (pid_t) -> Bool
+    public var isEditableTarget: (pid_t) -> Bool
     public var pasteKeyCode: () -> UInt16?
     public var sendPaste: (UInt16) -> Bool
 
     public init(write: @escaping (String) -> Int?, changeCount: @escaping () -> Int, isTrusted: @escaping () -> Bool,
                 activate: @escaping (pid_t) -> Bool, waitForFocus: @escaping () async -> Void,
-                isFrontmost: @escaping (pid_t) -> Bool, pasteKeyCode: @escaping () -> UInt16?,
+                isFrontmost: @escaping (pid_t) -> Bool, isEditableTarget: @escaping (pid_t) -> Bool,
+                pasteKeyCode: @escaping () -> UInt16?,
                 sendPaste: @escaping (UInt16) -> Bool) {
         self.write = write; self.changeCount = changeCount; self.isTrusted = isTrusted; self.activate = activate
-        self.waitForFocus = waitForFocus; self.isFrontmost = isFrontmost
+        self.waitForFocus = waitForFocus; self.isFrontmost = isFrontmost; self.isEditableTarget = isEditableTarget
         self.pasteKeyCode = pasteKeyCode; self.sendPaste = sendPaste
     }
 
@@ -38,6 +40,7 @@ public enum PasteResult: Equatable, Sendable {
         }, waitForFocus: {
             try? await Task.sleep(for: .milliseconds(150))
         }, isFrontmost: { NSWorkspace.shared.frontmostApplication?.processIdentifier == $0 },
+        isEditableTarget: { FocusedEditableTarget.isEditable(processID: $0) },
         pasteKeyCode: { KeyboardLayout().keyCode(for: "v") }, sendPaste: { code in
             guard let source = CGEventSource(stateID: .privateState),
                   let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
@@ -75,6 +78,11 @@ public enum PasteResult: Equatable, Sendable {
         guard let code = client.pasteKeyCode() else { return .copiedPasteUnavailable }
         // Another process can replace the shared clipboard while focus is settling.
         guard client.changeCount() == count else { return .copiedPasteUnavailable }
+        guard client.isEditableTarget(pid) else { return .copiedNoEditableTarget }
+        // The Accessibility query crosses a process boundary; focus and clipboard can change while it runs.
+        guard !Task.isCancelled, request == generation, client.isFrontmost(pid),
+              client.changeCount() == count else { return .copiedPasteUnavailable }
+        guard client.isTrusted() else { return .copiedNeedsAccessibility }
         return client.sendPaste(code) ? .pasted : .copiedPasteUnavailable
     }
 }

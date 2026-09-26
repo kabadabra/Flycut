@@ -20,7 +20,7 @@ jobs:
       - run: swift test
       - run: scripts/build-app.sh debug
       - run: scripts/build-app.sh release
-      - run: scripts/verify-app.sh build/Export/Flycut.app
+      - run: scripts/verify-app.sh 'build/Export/Flycut Evolution.app'
 
   # Retain until the Swift migration, UI and installation QA gates pass.
   legacy-2:

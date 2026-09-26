@@ -2,19 +2,19 @@
 
 ## 3.0.0 (2026-09-26)
 
-Flycut 3.0 is a complete Swift rewrite of the free, MIT licensed clipboard manager, maintained by Emerging Dynamics. It supports macOS 13 or later on Apple Silicon and Intel. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
+Flycut Evolution (version 3.0.0) is a complete Swift rewrite of the free, MIT licensed clipboard manager, maintained by Emerging Dynamics. It supports macOS 13 or later on Apple Silicon and Intel. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
 
 ### What’s new
 
-- A searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. It includes keyboard help, pause, copy, paste, merge, and text export.
+- A taller, more compact searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. Rows show the source app without a changing timestamp. Single-click selects; double-click or Return copies and pastes when the previous app has an editable field focused. Keyboard help, pause, merge, and text export remain available.
 - Refreshed settings for history, shortcuts, privacy, appearance, and startup behavior. Flycut can remember your chosen pause state and uses the current macOS Login Items system.
-- Local history with private storage and safer clipboard capture. Automatic paste checks Accessibility permission; Copy remains available when paste permission is denied.
+- Local history with private storage and safer clipboard capture. Automatic paste checks Accessibility permission and editable focus; activation leaves the clipping copied when paste is unavailable.
 
 ### Moving from an older Flycut
 
 - Review a preview of your old clippings and settings before import. Flycut preserves their order and available metadata, makes a private backup of the source, and leaves the original file untouched.
 - Choose how to handle an existing destination and whether imported history stays in memory or is saved. Imported history can raise capacity so clippings are not trimmed during the move.
-- Quit Flycut 2.0 before opening the new app. Verify your imported history before removing the old app. Both versions use the same app identity. See the [upgrade guide](https://github.com/kabadabra/Flycut#moving-to-flycut-30).
+- Quit Flycut 2.0 before opening the new app. Verify your imported history before removing the old app. Both versions use the same app identity. See the [upgrade guide](https://github.com/kabadabra/Flycut#moving-to-flycut-evolution).
 - iCloud sync is unavailable in this fork; imported cloud settings do not enable it.
 
 ### For developers

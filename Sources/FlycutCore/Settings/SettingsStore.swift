@@ -3,12 +3,14 @@ import Foundation
 public struct SettingsStore {
     private let defaults: UserDefaults
     private let prefix = "v3."
+    private let paletteSizeMigrationKey = "v3.evolutionPaletteSizeMigrated"
 
     public init(defaults: UserDefaults) {
         self.defaults = defaults
     }
 
     public func load() -> FlycutSettings {
+        migratePaletteSizeIfNeeded()
         let fallback = FlycutSettings()
         guard let data = try? JSONEncoder().encode(fallback),
               var dictionary = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
@@ -42,7 +44,20 @@ public struct SettingsStore {
         for (key, value) in dictionary {
             defaults.set(value, forKey: prefix + key)
         }
+        defaults.set(true, forKey: paletteSizeMigrationKey)
         if settings.saveToLocation == nil { defaults.removeObject(forKey: prefix + "saveToLocation") }
         if settings.autoSaveToLocation == nil { defaults.removeObject(forKey: prefix + "autoSaveToLocation") }
+    }
+
+    private func migratePaletteSizeIfNeeded() {
+        guard !defaults.bool(forKey: paletteSizeMigrationKey) else { return }
+        if defaults.object(forKey: prefix + "bezelWidth") != nil,
+           defaults.object(forKey: prefix + "bezelHeight") != nil,
+           defaults.double(forKey: prefix + "bezelWidth") == 500,
+           defaults.double(forKey: prefix + "bezelHeight") == 320 {
+            defaults.set(460.0, forKey: prefix + "bezelWidth")
+            defaults.set(700.0, forKey: prefix + "bezelHeight")
+        }
+        defaults.set(true, forKey: paletteSizeMigrationKey)
     }
 }

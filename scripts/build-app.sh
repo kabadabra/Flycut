@@ -12,12 +12,12 @@ cd "$root"
 
 if [[ $mode == debug ]]; then
     configuration=debug
-    app_name='Flycut Preview'
+    app_name='Flycut Evolution Preview'
     bundle_id='com.edynamics.flycut.preview'
     destination="$root/build/Preview/$app_name.app"
 else
     configuration=release
-    app_name='Flycut'
+    app_name='Flycut Evolution'
     bundle_id='com.edynamics.flycut'
     destination="$root/build/Export/$app_name.app"
 fi

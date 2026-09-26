@@ -16,7 +16,6 @@ import FlycutCore
     @Published var showTypes = false
     @Published var backgroundOpacity = 0.25
     @Published var showAccessibilityAlert = false
-    private var selectionPastes = true
     private var suppressAccessibilityAlert = false
     private var didExplainAccessibility = false
 
@@ -33,11 +32,11 @@ import FlycutCore
         previewCount = settings.menuPreviewCount
         showTypes = settings.revealPasteboardTypes
         backgroundOpacity = settings.bezelAlpha
-        selectionPastes = settings.menuSelectionPastes
         suppressAccessibilityAlert = settings.suppressAccessibilityAlert
     }
     func activateSelection() {
-        if selectionPastes { perform(.paste) } else { copy() }
+        guard selection.selected != nil else { return }
+        perform(.activate)
     }
     func reportAccessibilityDenied() {
         message = "Copied. Allow Accessibility access to paste automatically."
@@ -48,7 +47,6 @@ import FlycutCore
         }
     }
     var perform: (PaletteCommand) -> Void = { _ in }
-    var copy: () -> Void = {}
     var pause: () -> Void = {}
     var clear: () -> Void = {}
     var merge: () -> Void = {}

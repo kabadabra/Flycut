@@ -3,6 +3,41 @@ import XCTest
 @testable import FlycutCore
 
 final class SettingsTests: XCTestCase {
+    func testEvolutionPaletteDefaultsAndMissingLegacyDimensions() {
+        XCTAssertEqual(FlycutSettings().bezelWidth, 460)
+        XCTAssertEqual(FlycutSettings().bezelHeight, 700)
+        let imported = LegacySettingsMapper.map([:]).settings
+        XCTAssertEqual(imported.bezelWidth, 460)
+        XCTAssertEqual(imported.bezelHeight, 700)
+    }
+
+    func testOneTimePaletteSizeUpgradePreservesCustomAndLaterEdits() {
+        let suite = "SettingsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = SettingsStore(defaults: defaults)
+        defaults.set(500.0, forKey: "v3.bezelWidth")
+        defaults.set(320.0, forKey: "v3.bezelHeight")
+        XCTAssertEqual(store.load().bezelWidth, 460)
+        XCTAssertEqual(store.load().bezelHeight, 700)
+        XCTAssertEqual(defaults.double(forKey: "v3.bezelHeight"), 700)
+        var edited = store.load()
+        edited.bezelWidth = 530; edited.bezelHeight = 720
+        store.save(edited)
+        XCTAssertEqual(store.load().bezelWidth, 530)
+        XCTAssertEqual(store.load().bezelHeight, 720)
+    }
+
+    func testOneTimePaletteSizeUpgradeLeavesCustomDimensions() {
+        let suite = "SettingsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(600.0, forKey: "v3.bezelWidth")
+        defaults.set(600.0, forKey: "v3.bezelHeight")
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertEqual(store.load().bezelWidth, 600)
+        XCTAssertEqual(store.load().bezelHeight, 600)
+    }
     func testRememberPauseAndAppearanceRoundTrip() {
         let name = "flycut.synthetic." + UUID().uuidString
         let defaults = UserDefaults(suiteName: name)!

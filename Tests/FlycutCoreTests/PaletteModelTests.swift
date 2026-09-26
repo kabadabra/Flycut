@@ -34,7 +34,7 @@ final class PaletteModelTests: XCTestCase {
     }
     func testEscapeUsesHardwareCodeWhenCharactersAreEmpty() {
         XCTAssertEqual(PaletteCommand.resolve(keyCode: 53, key: "", editingSearch: true), .dismiss)
-        XCTAssertEqual(PaletteCommand.resolve(keyCode: 76, key: "", editingSearch: false), .paste)
+        XCTAssertEqual(PaletteCommand.resolve(keyCode: 76, key: "", editingSearch: false), .activate)
     }
     func testTypingDoesNotTriggerDestructiveOrLetterCommands() {
         XCTAssertNil(PaletteCommand.resolve(key: "f", editingSearch: true))
@@ -42,6 +42,6 @@ final class PaletteModelTests: XCTestCase {
         XCTAssertEqual(PaletteCommand.resolve(key: "F", editingSearch: false), .switchCollection)
         XCTAssertEqual(PaletteCommand.resolve(key: "f", editingSearch: false), .favorite)
         XCTAssertEqual(PaletteCommand.resolve(key: "S", editingSearch: false), .exportAll)
-        XCTAssertEqual(PaletteCommand.resolve(key: "\r", editingSearch: true), .paste)
+        XCTAssertEqual(PaletteCommand.resolve(key: "\r", editingSearch: true), .activate)
     }
 }

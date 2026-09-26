@@ -11,7 +11,7 @@ import FlycutCore
             let client = PasteClient(write: { text in board.text = text; board.changeCount += 2; return board.changeCount },
                                      changeCount: { board.changeCount }, isTrusted: { true }, activate: { _ in true },
                                      waitForFocus: { monitor.pollOnce() }, isFrontmost: { _ in true },
-                                     pasteKeyCode: { 47 }, sendPaste: { _ in true })
+                                     isEditableTarget: { _ in true }, pasteKeyCode: { 47 }, sendPaste: { _ in true })
             let service = PasteService(client: client, recordSelfWrite: { monitor.recordSelfWrite(changeCount: $0) })
             _ = await service.copyOrPaste("selected", mode: mode, previousApp: 123)
             monitor.pollOnce()
@@ -72,7 +72,42 @@ import FlycutCore
         let fixture = PasteFixture(trusted: true)
         let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
         XCTAssertEqual(result, .pasted)
-        XCTAssertEqual(fixture.actions, ["write", "record:2", "activate:123", "wait", "front:123", "key:47"])
+        XCTAssertEqual(fixture.actions, ["write", "record:2", "activate:123", "wait", "front:123", "editable:123", "front:123", "key:47"])
+    }
+
+    func testNoEditableFieldLeavesTextCopiedWithoutSendingPaste() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.editable = false
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .copiedNoEditableTarget)
+        XCTAssertTrue(fixture.actions.contains("editable:123"))
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+        XCTAssertEqual(fixture.actions.filter { $0 == "write" }.count, 1)
+    }
+
+    func testFieldBecomingNoneditableDuringFocusWaitDoesNotPaste() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = { fixture.editable = false }
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .copiedNoEditableTarget)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+    }
+
+    func testFocusOrClipboardChangingDuringEditableCheckDoesNotPaste() async {
+        for change in ["focus", "clipboard", "trust"] {
+            let fixture = PasteFixture(trusted: true)
+            fixture.duringEditableCheck = {
+                switch change {
+                case "focus": fixture.frontmost = false
+                case "clipboard": fixture.count = 3
+                default: fixture.trusted = false
+                }
+            }
+            let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+            XCTAssertEqual(result, change == "trust" ? .copiedNeedsAccessibility : .copiedPasteUnavailable,
+                           "\(change) changed during the Accessibility check")
+            XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+        }
     }
 
     func testLostFocusAndMissingLayoutDoNotSendEvents() async {
@@ -200,9 +235,11 @@ import FlycutCore
     var actions: [String] = []
     var count = 2
     var frontmost = true
+    var editable = true
     var key: UInt16? = 47
     var trusted: Bool
     var duringWait: @MainActor () async -> Void = {}
+    var duringEditableCheck: @MainActor () -> Void = {}
     init(trusted: Bool) { self.trusted = trusted }
     lazy var service = PasteService(client: PasteClient(
         write: { [unowned self] _ in actions.append("write"); return 2 },
@@ -211,6 +248,7 @@ import FlycutCore
         activate: { [unowned self] pid in actions.append("activate:\(pid)"); return true },
         waitForFocus: { [unowned self] in actions.append("wait"); await duringWait() },
         isFrontmost: { [unowned self] pid in actions.append("front:\(pid)"); return frontmost },
+        isEditableTarget: { [unowned self] pid in actions.append("editable:\(pid)"); duringEditableCheck(); return editable },
         pasteKeyCode: { [unowned self] in key },
         sendPaste: { [unowned self] key in actions.append("key:\(key)"); return true }
     ), recordSelfWrite: { [unowned self] count in actions.append("record:\(count)") })

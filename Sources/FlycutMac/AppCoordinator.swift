@@ -153,7 +153,6 @@ import FlycutPlatform
     }
     private func wireActions() {
         model.perform = { [weak self] in self?.perform($0) }
-        model.copy = { [weak self] in self?.copyOrPaste(.copy) }
         model.pause = { [weak self] in
             guard let self else { return }
             model.isPaused.toggle(); monitor.isPaused = model.isPaused
@@ -166,7 +165,7 @@ import FlycutPlatform
             showSettings?()
         }
         model.about = {
-            NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Flycut", .applicationVersion: FlycutVersion.current,
+            NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Flycut Evolution", .applicationVersion: FlycutVersion.current,
                 .credits: NSAttributedString(string: "Maintained by Emerging Dynamics\nFork of TermiT/Flycut and Jumpcut\nFree and open source · MIT license")])
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -186,7 +185,7 @@ import FlycutPlatform
         case .previous: model.selection.move(-1)
         case .digit(let value): model.selection.selectDigit(value)
         case .dismiss: shell.dismiss()
-        case .paste: copyOrPaste(.paste)
+        case .activate: copyOrPaste(.paste)
         case .favorite:
             guard let clip = model.selection.selected, clip.collection == .recent else { return }
             enqueue { _ = try await $0.history.favorite(id: clip.id) }
@@ -215,6 +214,9 @@ import FlycutPlatform
             case .pasted: model.message = nil
             case .copiedNeedsAccessibility:
                 model.reportAccessibilityDenied()
+                shell.showPanel()
+            case .copiedNoEditableTarget:
+                model.message = "Copied. No editable text field is focused."
                 shell.showPanel()
             case .copiedPasteUnavailable:
                 model.message = "Copied. Paste manually in the destination app."

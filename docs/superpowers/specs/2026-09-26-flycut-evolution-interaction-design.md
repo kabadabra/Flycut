@@ -4,11 +4,11 @@
 
 Flycut Evolution keeps the current `com.edynamics.flycut` identity and 3.0.0 technical version so the installed Swift candidate, migrated history, Apple signing, and login registration continue to work. The visible app, About screen, release title, DMG, and active documentation use **Flycut Evolution**. The GitHub repository remains Flycut and retains upstream credit.
 
-Selecting a clipping with one click is the primary action. Flycut copies its text to the clipboard, then pastes into the app the user came from only when that app has an enabled, editable text control focused. If no text field is focused, Accessibility is unavailable, focus changes, the app disappears, or the keyboard layout cannot provide Paste, Flycut leaves the clipping on the clipboard and does not synthesize a Paste event. Return performs the same action on the keyboard-selected row. Arrow keys still move selection without activating it.
+Single-click selects a clipping; double-click activates it. Activation copies its text to the clipboard, then pastes into the app the user came from only when that app has an enabled, editable text control focused. If no text field is focused, Accessibility is unavailable, focus changes, the app disappears, or the keyboard layout cannot provide Paste, Flycut leaves the clipping on the clipboard and does not synthesize a Paste event. Return performs the same action on the keyboard-selected row. Arrow keys still move selection without activating it.
 
 ## Palette
 
-Use a taller, slightly narrower default palette: 460 × 700 points, bounded by the visible screen. Keep the existing two-line clipping preview and source/time metadata, but tighten row spacing and padding so more rows are visible. Search and collection controls remain. Single-click and the accessible Activate action activate a row; a rapid second click on the same row must not paste twice. Remove the separate Copy and Paste controls from the footer and row menu. Favorite, export, delete, help, pause, and settings remain available. The footer or help text explains “Click or press Return to copy; Flycut pastes when a text field is focused.”
+Use a taller, slightly narrower default palette: 460 × 700 points, bounded by the visible screen. Keep the two-line clipping preview and source app, remove the changing relative time, and tighten row spacing and padding so more rows are visible. Search and collection controls remain. Single-click selects; double-click and the accessible Activate action activate once. Remove the separate Copy and Paste controls from the footer and row menu. Favorite, export, delete, help, pause, and settings remain available. The footer or help text explains “Double-click or press Return to copy; Flycut pastes when a text field is focused.”
 
 The legacy `menuSelectionPastes` value can stay in stored data for compatibility, but it no longer controls row activation or appears as a setting. Migration explains this changed behavior rather than silently claiming old double-click semantics. Existing imported dimensions 500 × 320 are upgraded once to the new layout; custom dimensions remain untouched. Users can still edit width and height in Appearance. New legacy imports with no explicit dimensions use the new layout; explicit legacy dimensions remain respected.
 
@@ -24,9 +24,9 @@ Package the production app as `Flycut Evolution.app`, preview as `Flycut Evoluti
 
 ## Verification
 
-- Tests first: automatic row activation independent of the obsolete preference; Return activation; no duplicate activation; editable and noneditable focus outcomes; permission, cancellation, clipboard-change and app-focus guards; layout defaults and one-time dimension migration; bundle/display name and release artifact checks.
+- Tests first: double-click row activation independent of the obsolete preference; Return activation; editable and noneditable focus outcomes; permission, cancellation, clipboard-change and app-focus guards; layout defaults and one-time dimension migration; bundle/display name and release artifact checks.
 - Full Swift suite, Debug and universal Release builds, strict bundle verification, Graphify refresh, CI, and a nonpublishing signed/notarized dry run.
-- Synthetic UI pass on macOS 27: row click, Return, compact taller palette, editable-target automatic paste after user-approved Accessibility permission, no-field Copy fallback, and content-free confirmation that the real migrated 50 clips persist. Preserve the previous 2.0 backup.
+- Synthetic UI pass on macOS 27: single-click selection, double-click activation, Return, compact taller palette without relative time, editable-target automatic paste after user-approved Accessibility permission, no-field Copy fallback, and content-free confirmation that the real migrated 50 clips persist. Preserve the previous 2.0 backup.
 
 ## Current limits
 

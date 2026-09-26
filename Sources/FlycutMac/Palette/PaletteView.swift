@@ -9,7 +9,7 @@ struct PaletteView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("Flycut").font(.title2.bold())
+                Text("Flycut Evolution").font(.title2.bold())
                 Spacer()
                 Button(action: model.pause) { Image(systemName: model.isPaused ? "play.fill" : "pause.fill") }
                     .help(model.isPaused ? "Resume capture" : "Pause capture")
@@ -21,9 +21,9 @@ struct PaletteView: View {
                     Divider()
                     Button("Keyboard Help") { showHelp.toggle() }
                     Button("Settings…", action: model.settings)
-                    Button("About Flycut", action: model.about)
+                    Button("About Flycut Evolution", action: model.about)
                     Divider()
-                    Button("Quit Flycut", action: model.quit)
+                    Button("Quit Flycut Evolution", action: model.quit)
                 } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).fixedSize()
                 .accessibilityLabel("Flycut commands")
             }
@@ -54,8 +54,6 @@ struct PaletteView: View {
                             .accessibilityAction(named: "Activate Clipping") { model.selection.select(clip.id); model.activateSelection() }
                             .onTapGesture { searching = false; model.selection.select(clip.id) }
                             .contextMenu {
-                                Button("Copy") { model.selection.select(clip.id); model.copy() }
-                                Button("Paste") { model.selection.select(clip.id); model.perform(.paste) }
                                 Button("Move to Favorites") { model.selection.select(clip.id); model.perform(.favorite) }
                                     .disabled(clip.collection == .favorite)
                                 Button("Export…") { model.selection.select(clip.id); model.perform(.exportSelected) }
@@ -71,15 +69,13 @@ struct PaletteView: View {
                 Button("Show All \(model.selection.clips.count) Clippings") { model.showAll = true }
             }
             HStack {
-                Button("Copy", action: model.copy).disabled(model.selection.selected == nil)
-                Button("Paste") { model.perform(.paste) }.disabled(model.selection.selected == nil)
                 Button("Favorite") { model.perform(.favorite) }.disabled(model.selection.collection == .favorite || model.selection.selected == nil)
                 Button("Save…") { model.perform(.exportSelected) }.disabled(model.selection.selected == nil)
                 Spacer()
                 Button { showHelp.toggle() } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("Keyboard help")
             }
             if showHelp {
-                Text("↑/↓ or j/k · Home/End · Page Up/Down · 1–0 select\nReturn paste · Esc close · Delete remove · f favorite · F switch list\ns save selected · S save collection · Tab leave search · ⌘F search\nDouble-click follows the row action in Settings.\nLetters, digits and Delete edit text while searching.")
+                Text("↑/↓ or j/k · Home/End · Page Up/Down · 1–0 select\nDouble-click or Return to copy and paste when a text field is focused · Esc close\nDelete remove · f favorite · F switch list · s save selected · S save collection\nTab leave search · ⌘F search · Letters and digits edit text while searching.")
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
         }.padding(16).frame(maxWidth: .infinity, maxHeight: .infinity)
