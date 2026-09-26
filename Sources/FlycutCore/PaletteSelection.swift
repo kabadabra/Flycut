@@ -34,6 +34,11 @@ public struct PaletteSelection: Sendable {
 
 public enum PaletteCommand: Equatable, Sendable {
     case paste, dismiss, favorite, switchCollection, exportSelected, exportAll, delete, next, previous, digit(Int)
+    public static func resolve(keyCode: UInt16, key: String, editingSearch: Bool) -> Self? {
+        if keyCode == 53 { return .dismiss }
+        if keyCode == 36 || keyCode == 76 { return .paste }
+        return resolve(key: key, editingSearch: editingSearch)
+    }
     public static func resolve(key: String, editingSearch: Bool) -> Self? {
         if key == "\r" { return .paste }
         if key == "\u{1b}" { return .dismiss }

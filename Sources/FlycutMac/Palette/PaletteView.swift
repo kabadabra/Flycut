@@ -33,6 +33,9 @@ struct PaletteView: View {
                 Text("Recents").tag(CollectionKind.recent)
                 Text("Favorites").tag(CollectionKind.favorite)
             }.pickerStyle(.segmented)
+            if let warning = model.storageWarning {
+                Label(warning, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+            }
             if let message = model.message { Text(message).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading) }
             if model.needsAccessibility { Button("Open Accessibility Settings", action: model.accessibility) }
             if model.isPaused { Label("Capture paused", systemImage: "pause.circle").font(.caption) }
@@ -74,6 +77,7 @@ struct PaletteView: View {
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
         }.padding(16).frame(minWidth: 460, minHeight: 400).background(.regularMaterial)
+        .onExitCommand { model.perform(.dismiss) }
         .onAppear { searching = true }
         .onChange(of: model.presentation) { _ in searching = true }
         .alert("Clear all recent clippings?", isPresented: $confirmClear) {

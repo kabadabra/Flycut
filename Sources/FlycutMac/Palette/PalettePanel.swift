@@ -26,7 +26,7 @@ final class PalettePanel: NSPanel {
             case 116 where !editing: model.selection.move(-10)
             case 121 where !editing: model.selection.move(10)
             default:
-                guard let action = PaletteCommand.resolve(key: event.characters ?? "", editingSearch: editing) else { return event }
+                guard let action = PaletteCommand.resolve(keyCode: event.keyCode, key: event.characters ?? "", editingSearch: editing) else { return event }
                 model.perform(action)
             }
             return nil

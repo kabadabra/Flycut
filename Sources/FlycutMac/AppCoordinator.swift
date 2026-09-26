@@ -7,7 +7,7 @@ import FlycutPlatform
     private(set) var settings: FlycutSettings
     private let settingsStore: SettingsStore
     private let repository: SQLiteHistoryRepository
-    private var disk: SQLiteHistoryRepository?
+    private var persistence: HistoryPersistence?
     private var history: HistoryService
     private var monitor: ClipboardMonitor!
     private var hotkey: HotkeyService!
@@ -50,11 +50,16 @@ import FlycutPlatform
         // The monitor has already recorded the launch count without reading clipboard text.
         enqueue { coordinator in
             if coordinator.settings.saveMode != .never {
-                let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
-                let directory = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
-                let disk = try SQLiteHistoryRepository(url: directory.appendingPathComponent("history.sqlite"))
-                coordinator.disk = disk
-                try await coordinator.repository.replaceAll(disk.snapshot())
+                do {
+                    let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
+                    let directory = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
+                    let disk = try SQLiteHistoryRepository(url: directory.appendingPathComponent("history.sqlite"))
+                    let persistence = HistoryPersistence(destination: disk)
+                    coordinator.persistence = persistence
+                    try await persistence.restore(into: coordinator.repository)
+                } catch {
+                    coordinator.model.storageWarning = "Saved history could not be loaded and has been left untouched. Capture will continue in memory only for this session. Export any new clippings before quitting; repair or restore the saved database before relaunching."
+                }
             }
             coordinator.monitor.start()
         }
@@ -142,7 +147,9 @@ import FlycutPlatform
         guard let clip = model.selection.selected else { return }
         pasteTask?.cancel()
         let target = previousApp
-        if mode == .paste || !settings.stickyPalette { shell.dismiss() }
+        if mode == .paste {
+            shell.prepareForPaste(sticky: settings.stickyPalette)
+        } else if !settings.stickyPalette { shell.dismiss() }
         pasteTask = Task { [weak self] in
             guard let self, !Task.isCancelled else { return }
             let result = await paste.copyOrPaste(clip.text, mode: mode, previousApp: target)
@@ -193,12 +200,12 @@ import FlycutPlatform
     }
     private func persist(_ snapshot: HistorySnapshot) async throws {
         guard settings.saveMode != .never else { return }
-        if disk == nil {
-            let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
-            let directory = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
-            disk = try SQLiteHistoryRepository(url: directory.appendingPathComponent("history.sqlite"))
+        guard let persistence, try await persistence.save(snapshot) else {
+            if model.storageWarning == nil {
+                model.storageWarning = "This session is running in memory only. Saved history has not been replaced. Export new clippings before quitting."
+            }
+            return
         }
-        try await disk?.replaceAll(snapshot)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

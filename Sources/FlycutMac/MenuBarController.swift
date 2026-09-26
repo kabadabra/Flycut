@@ -22,6 +22,7 @@ import SwiftUI
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false
         panel.level = .floating
+        panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         keyboard = PaletteKeyboard(model: model) { [weak self] window in
             guard let self, let window else { return false }
@@ -46,5 +47,18 @@ import SwiftUI
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
     }
+    /// Keep a sticky panel visible while PasteService activates the destination.
+    /// orderFrontRegardless does not make the panel key or activate Flycut.
+    func prepareForPaste(sticky: Bool) {
+        guard sticky else { dismiss(); return }
+        if popover.isShown {
+            if let frame = popover.contentViewController?.view.window?.frame {
+                panel.setFrameOrigin(frame.origin)
+            }
+            popover.performClose(nil)
+        }
+        panel.orderFrontRegardless()
+    }
+
     func dismiss() { popover.performClose(nil); panel.orderOut(nil); didDismiss() }
 }

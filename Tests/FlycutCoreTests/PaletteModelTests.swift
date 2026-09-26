@@ -32,6 +32,10 @@ final class PaletteModelTests: XCTestCase {
         state.selectDigit(9); XCTAssertEqual(state.selectedID, b.id)
         state.query = "missing"; state.move(1); XCTAssertNil(state.selectedID)
     }
+    func testEscapeUsesHardwareCodeWhenCharactersAreEmpty() {
+        XCTAssertEqual(PaletteCommand.resolve(keyCode: 53, key: "", editingSearch: true), .dismiss)
+        XCTAssertEqual(PaletteCommand.resolve(keyCode: 76, key: "", editingSearch: false), .paste)
+    }
     func testTypingDoesNotTriggerDestructiveOrLetterCommands() {
         XCTAssertNil(PaletteCommand.resolve(key: "f", editingSearch: true))
         XCTAssertNil(PaletteCommand.resolve(key: "\u{7f}", editingSearch: true))

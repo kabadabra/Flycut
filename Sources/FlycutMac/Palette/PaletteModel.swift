@@ -6,6 +6,7 @@ import FlycutCore
     @Published var selection = PaletteSelection()
     @Published var isPaused = false
     @Published var message: String?
+    @Published var storageWarning: String?
     @Published var needsAccessibility = false
     @Published var showSource = true
     @Published var previewLength = 40
