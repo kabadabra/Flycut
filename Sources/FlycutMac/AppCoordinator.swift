@@ -159,7 +159,6 @@ import FlycutPlatform
             settings.capturePaused = model.isPaused; settingsStore.save(settings)
         }
         model.clear = { [weak self] in self?.enqueue { _ = try await $0.history.clearRecents() } }
-        model.merge = { [weak self] in self?.enqueue { _ = try await $0.history.mergeAll() } }
         model.settings = { [weak self] in
             guard let self else { return }
             showSettings?()

@@ -6,7 +6,7 @@ Flycut Evolution (version 3.0.0) is a complete Swift rewrite of the free, MIT li
 
 ### What’s new
 
-- A taller, more compact searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. Rows show the source app without a changing timestamp. Single-click selects; double-click or Return copies and pastes when the previous app has an editable field focused. Keyboard help, pause, merge, and text export remain available.
+- A taller, more compact searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. Rows show the source app without a changing timestamp. The first click selects immediately; double-click or Return copies and pastes when the previous app has an editable field focused. Keyboard help, pause, and text export remain available.
 - Refreshed settings for history, shortcuts, privacy, appearance, and startup behavior. Flycut can remember your chosen pause state and uses the current macOS Login Items system.
 - Local history with private storage and safer clipboard capture. Automatic paste checks Accessibility permission and editable focus; activation leaves the clipping copied when paste is unavailable.
 

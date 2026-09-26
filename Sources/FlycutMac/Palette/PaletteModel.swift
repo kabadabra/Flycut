@@ -38,6 +38,10 @@ import FlycutCore
         guard selection.selected != nil else { return }
         perform(.activate)
     }
+    func handleRowClick(_ id: UUID, clickCount: Int) {
+        selection.select(id)
+        if clickCount == 2 { activateSelection() }
+    }
     func reportAccessibilityDenied() {
         message = "Copied. Allow Accessibility access to paste automatically."
         needsAccessibility = true
@@ -49,7 +53,6 @@ import FlycutCore
     var perform: (PaletteCommand) -> Void = { _ in }
     var pause: () -> Void = {}
     var clear: () -> Void = {}
-    var merge: () -> Void = {}
     var settings: () -> Void = {}
     var about: () -> Void = {}
     var accessibility: () -> Void = {}
