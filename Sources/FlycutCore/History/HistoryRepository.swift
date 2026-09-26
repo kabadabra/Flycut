@@ -46,5 +46,6 @@ public enum HistoryError: Error, Equatable, Sendable {
     case missingClip
     case invalidCollection
     case unsupportedSchema(Int)
+    case staleSnapshot
     case database(String)
 }

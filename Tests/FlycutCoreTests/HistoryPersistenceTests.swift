@@ -56,4 +56,27 @@ final class HistoryPersistenceTests: XCTestCase {
         let after = try await persistence.save(HistorySnapshot(recent: [], favorites: []))
         XCTAssertTrue(after)
     }
+
+    func testExternalHistoryChangeCannotBeOverwrittenByStaleQuitSnapshot() async throws {
+        let disk = try SQLiteHistoryRepository(), working = try SQLiteHistoryRepository()
+        let persistence = HistoryPersistence(destination: disk)
+        try await persistence.restore(into: working)
+        let recovered = HistorySnapshot(recent: (0..<50).map { index in
+            Clip(id: UUID(), text: "Recovered \(index)", pasteboardType: "text", sourceAppName: nil,
+                 sourceBundleURL: nil, capturedAt: nil, collection: .recent, order: index)
+        }, favorites: [])
+        try await disk.replaceAll(recovered)
+        let stale = HistorySnapshot(recent: [Clip(id: UUID(), text: "new capture", pasteboardType: "text",
+                                                  sourceAppName: nil, sourceBundleURL: nil, capturedAt: nil,
+                                                  collection: .recent, order: 0)], favorites: [])
+
+        do {
+            _ = try await persistence.save(stale)
+            XCTFail("A stale session must not replace history written after restore")
+        } catch {
+            XCTAssertEqual(error as? HistoryError, .staleSnapshot)
+        }
+        let final = try await disk.snapshot()
+        XCTAssertEqual(final, recovered)
+    }
 }
