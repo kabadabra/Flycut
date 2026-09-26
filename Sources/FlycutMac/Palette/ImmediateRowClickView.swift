@@ -31,3 +31,38 @@ struct ImmediateRowClickSurface: NSViewRepresentable {
         view.onClick = onClick
     }
 }
+
+/// The optional type detail remains selectable while its mouse-down follows
+/// the same immediate row-selection path as the rest of the clipping.
+final class SelectableTypeField: NSTextField {
+    var onClick: (Int) -> Void = { _ in }
+
+    override func mouseDown(with event: NSEvent) {
+        onClick(event.clickCount)
+        super.mouseDown(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        nextResponder?.rightMouseDown(with: event)
+    }
+}
+
+struct SelectableTypeLabel: NSViewRepresentable {
+    let text: String
+    let onClick: (Int) -> Void
+
+    func makeNSView(context: Context) -> SelectableTypeField {
+        let field = SelectableTypeField(labelWithString: text)
+        field.isSelectable = true
+        field.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        field.textColor = .secondaryLabelColor
+        field.lineBreakMode = .byTruncatingTail
+        field.onClick = onClick
+        return field
+    }
+
+    func updateNSView(_ field: SelectableTypeField, context: Context) {
+        field.stringValue = text
+        field.onClick = onClick
+    }
+}

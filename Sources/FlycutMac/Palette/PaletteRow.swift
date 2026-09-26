@@ -22,8 +22,7 @@ struct PaletteRow: View {
             .contentShape(Rectangle())
             .overlay { ImmediateRowClickSurface(onClick: onClick) }
             if showType {
-                Text("Type: \(clip.pasteboardType)").font(.caption).foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                SelectableTypeLabel(text: "Type: \(clip.pasteboardType)", onClick: onClick)
                     .padding(.horizontal, 8).padding(.bottom, 5)
             }
         }
