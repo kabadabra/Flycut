@@ -40,6 +40,21 @@ public actor HistoryService {
     }
 
     @discardableResult
+    public func clearRecents() async throws -> HistorySnapshot {
+        try await repository.apply(.clear(.recent))
+    }
+
+    @discardableResult
+    public func delete(id: UUID) async throws -> HistorySnapshot {
+        try await repository.apply(.delete(id))
+    }
+
+    @discardableResult
+    public func moveToTop(id: UUID) async throws -> HistorySnapshot {
+        try await repository.apply(.moveToTop(id))
+    }
+
+    @discardableResult
     public func mergeAll() async throws -> Clip? {
         let snapshot = try await repository.update { current in
             guard let newest = current.recent.first else { return }

@@ -1,0 +1,84 @@
+import SwiftUI
+import FlycutCore
+
+struct PaletteView: View {
+    @ObservedObject var model: PaletteModel
+    @FocusState private var searching: Bool
+    @State private var confirmClear = false
+    @State private var showHelp = false
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("Flycut").font(.title2.bold())
+                Spacer()
+                Button(action: model.pause) { Image(systemName: model.isPaused ? "play.fill" : "pause.fill") }
+                    .help(model.isPaused ? "Resume capture" : "Pause capture")
+                    .accessibilityLabel(model.isPaused ? "Resume capture" : "Pause capture")
+                Menu {
+                    Button("Merge All Recents", action: model.merge)
+                    Button("Export Collection…") { model.perform(.exportAll) }
+                    Button("Clear All Recents…") { confirmClear = true }
+                    Divider()
+                    Button("Keyboard Help") { showHelp.toggle() }
+                    Button("Settings…", action: model.settings)
+                    Button("About Flycut", action: model.about)
+                    Divider()
+                    Button("Quit Flycut", action: model.quit)
+                } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).fixedSize()
+                .accessibilityLabel("Flycut commands")
+            }
+            TextField("Search clippings", text: $model.selection.query)
+                .textFieldStyle(.roundedBorder).focused($searching).accessibilityLabel("Search clippings")
+            Picker("Collection", selection: $model.selection.collection) {
+                Text("Recents").tag(CollectionKind.recent)
+                Text("Favorites").tag(CollectionKind.favorite)
+            }.pickerStyle(.segmented)
+            if let message = model.message { Text(message).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading) }
+            if model.needsAccessibility { Button("Open Accessibility Settings", action: model.accessibility) }
+            if model.isPaused { Label("Capture paused", systemImage: "pause.circle").font(.caption) }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 3) {
+                        if model.selection.clips.isEmpty {
+                            Text(model.selection.query.isEmpty ? "No clippings yet" : "No matching clippings")
+                                .foregroundStyle(.secondary).padding(30)
+                        }
+                        ForEach(model.selection.clips, id: \.id) { clip in
+                            PaletteRow(clip: clip, selected: clip.id == model.selection.selectedID,
+                                       showSource: model.showSource, previewLength: model.previewLength)
+                            .contentShape(Rectangle())
+                            .onTapGesture(count: 2) { model.selection.select(clip.id); model.perform(.paste) }
+                            .onTapGesture { searching = false; model.selection.select(clip.id) }
+                            .contextMenu {
+                                Button("Copy") { model.selection.select(clip.id); model.copy() }
+                                Button("Paste") { model.selection.select(clip.id); model.perform(.paste) }
+                                Button("Move to Favorites") { model.selection.select(clip.id); model.perform(.favorite) }
+                                    .disabled(clip.collection == .favorite)
+                                Button("Export…") { model.selection.select(clip.id); model.perform(.exportSelected) }
+                                Button("Delete") { model.selection.select(clip.id); model.perform(.delete) }
+                            }.id(clip.id)
+                        }
+                    }
+                }.onChange(of: model.selection.selectedID) { id in if let id { proxy.scrollTo(id) } }
+            }
+            HStack {
+                Button("Copy", action: model.copy).disabled(model.selection.selected == nil)
+                Button("Paste") { model.perform(.paste) }.disabled(model.selection.selected == nil)
+                Button("Favorite") { model.perform(.favorite) }.disabled(model.selection.collection == .favorite || model.selection.selected == nil)
+                Button("Save…") { model.perform(.exportSelected) }.disabled(model.selection.selected == nil)
+                Spacer()
+                Button { showHelp.toggle() } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("Keyboard help")
+            }
+            if showHelp {
+                Text("↑/↓ or j/k · Home/End · Page Up/Down · 1–0 select\nReturn paste · Esc close · Delete remove · f favorite · F switch list\ns save selected · S save collection · Tab leave search · ⌘F search\nLetters, digits and Delete edit text while searching.")
+                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }.padding(16).frame(minWidth: 460, minHeight: 400).background(.regularMaterial)
+        .onAppear { searching = true }
+        .onChange(of: model.presentation) { _ in searching = true }
+        .alert("Clear all recent clippings?", isPresented: $confirmClear) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear Recents", role: .destructive, action: model.clear)
+        } message: { Text("Favorites will be kept. This cannot be undone.") }
+    }
+}
