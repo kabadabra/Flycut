@@ -4,19 +4,26 @@
 public actor HistoryPersistence {
     private let destination: any HistoryRepository
     private var restored = false
+    private var expectedDestination: HistorySnapshot?
     public init(destination: any HistoryRepository) { self.destination = destination }
 
     public func restore(into working: any HistoryRepository) async throws {
         restored = false
+        expectedDestination = nil
         let snapshot = try await destination.snapshot()
         try await working.replaceAll(snapshot)
+        expectedDestination = snapshot
         restored = true
     }
 
     @discardableResult
     public func save(_ snapshot: HistorySnapshot) async throws -> Bool {
-        guard restored else { return false }
-        try await destination.replaceAll(snapshot)
+        guard restored, let expectedDestination else { return false }
+        let saved = try await destination.update { current in
+            guard current == expectedDestination else { throw HistoryError.staleSnapshot }
+            current = snapshot
+        }
+        self.expectedDestination = saved
         return true
     }
 }
