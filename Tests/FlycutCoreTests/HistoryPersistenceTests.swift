@@ -70,10 +70,12 @@ final class HistoryPersistenceTests: XCTestCase {
                                                   sourceAppName: nil, sourceBundleURL: nil, capturedAt: nil,
                                                   collection: .recent, order: 0)], favorites: [])
 
-        var rejected = false
-        do { _ = try await persistence.save(stale) }
-        catch { rejected = true }
-        XCTAssertTrue(rejected, "A stale session must not replace history written after restore")
+        do {
+            _ = try await persistence.save(stale)
+            XCTFail("A stale session must not replace history written after restore")
+        } catch {
+            XCTAssertEqual(error as? HistoryError, .staleSnapshot)
+        }
         let final = try await disk.snapshot()
         XCTAssertEqual(final, recovered)
     }
