@@ -15,7 +15,6 @@ struct PaletteView: View {
                     .help(model.isPaused ? "Resume capture" : "Pause capture")
                     .accessibilityLabel(model.isPaused ? "Resume capture" : "Pause capture")
                 Menu {
-                    Button("Merge All Recents", action: model.merge)
                     Button("Export Collection…") { model.perform(.exportAll) }
                     Button("Clear All Recents…") { confirmClear = true }
                     Divider()
@@ -50,9 +49,13 @@ struct PaletteView: View {
                             PaletteRow(clip: clip, selected: clip.id == model.selection.selectedID,
                                        showSource: model.showSource, showType: model.showTypes, previewLength: model.previewLength)
                             .contentShape(Rectangle())
-                            .onTapGesture(count: 2) { model.selection.select(clip.id); model.activateSelection() }
+                            .overlay {
+                                ImmediateRowClickSurface { count in
+                                    searching = false
+                                    model.handleRowClick(clip.id, clickCount: count)
+                                }
+                            }
                             .accessibilityAction(named: "Activate Clipping") { model.selection.select(clip.id); model.activateSelection() }
-                            .onTapGesture { searching = false; model.selection.select(clip.id) }
                             .contextMenu {
                                 Button("Move to Favorites") { model.selection.select(clip.id); model.perform(.favorite) }
                                     .disabled(clip.collection == .favorite)
