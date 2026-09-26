@@ -33,6 +33,9 @@ public indirect enum HistoryChange: Sendable {
 public protocol HistoryRepository: Sendable {
     func snapshot() async throws -> HistorySnapshot
     func apply(_ change: HistoryChange) async throws -> HistorySnapshot
+    /// Runs the synchronous mutation inside the same transaction as its read and write.
+    /// Implementations must serialize it with apply and replaceAll, including migration writes.
+    func update(_ body: @Sendable (inout HistorySnapshot) throws -> Void) async throws -> HistorySnapshot
     func replaceAll(_ snapshot: HistorySnapshot) async throws
 }
 

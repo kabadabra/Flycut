@@ -5,9 +5,21 @@ import Darwin
 public actor SQLiteHistoryRepository: HistoryRepository {
     nonisolated(unsafe) private let database: OpaquePointer
     private let url: URL?
+    private let permissionMaintenance: @Sendable (URL) throws -> Void
+    private let metadataStep: @Sendable (OpaquePointer?) -> Int32
 
     public init(url: URL) throws {
+        try self.init(url: url, permissionMaintenance: Self.restrictPermissions, metadataStep: sqlite3_step)
+    }
+
+    internal init(
+        url: URL,
+        permissionMaintenance: @escaping @Sendable (URL) throws -> Void,
+        metadataStep: @escaping @Sendable (OpaquePointer?) -> Int32
+    ) throws {
         self.url = url
+        self.permissionMaintenance = permissionMaintenance
+        self.metadataStep = metadataStep
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
@@ -36,13 +48,15 @@ public actor SQLiteHistoryRepository: HistoryRepository {
                     try Self.execute(handle, "CREATE INDEX IF NOT EXISTS clips_order ON clips(collection, position)")
                     try Self.execute(handle, "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
                     try Self.execute(handle, "PRAGMA user_version=1")
+                    try Self.restrictPermissions(url)
                     try Self.execute(handle, "COMMIT")
                 } catch {
                     try? Self.execute(handle, "ROLLBACK")
                     throw error
                 }
+            } else {
+                try Self.restrictPermissions(url)
             }
-            try Self.restrictPermissions(url)
         } catch {
             sqlite3_close(handle)
             throw error
@@ -51,6 +65,8 @@ public actor SQLiteHistoryRepository: HistoryRepository {
 
     public init(inMemory: Void = ()) throws {
         url = nil
+        permissionMaintenance = Self.restrictPermissions
+        metadataStep = sqlite3_step
         var handle: OpaquePointer?
         guard sqlite3_open_v2(":memory:", &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let handle else {
             defer { if let handle { sqlite3_close(handle) } }
@@ -72,9 +88,13 @@ public actor SQLiteHistoryRepository: HistoryRepository {
     public func snapshot() throws -> HistorySnapshot { try readSnapshot() }
 
     public func apply(_ change: HistoryChange) throws -> HistorySnapshot {
+        try update { try Self.mutate(&$0, change) }
+    }
+
+    public func update(_ body: @Sendable (inout HistorySnapshot) throws -> Void) throws -> HistorySnapshot {
         try transaction {
             var current = try readSnapshot()
-            try mutate(&current, change)
+            try body(&current)
             try writeSnapshot(current)
             return try readSnapshot()
         }
@@ -84,7 +104,7 @@ public actor SQLiteHistoryRepository: HistoryRepository {
         try transaction { try writeSnapshot(snapshot) }
     }
 
-    private func mutate(_ snapshot: inout HistorySnapshot, _ change: HistoryChange) throws {
+    private static func mutate(_ snapshot: inout HistorySnapshot, _ change: HistoryChange) throws {
         switch change {
         case .insert(let clip):
             guard !snapshot.recent.contains(where: { $0.id == clip.id }), !snapshot.favorites.contains(where: { $0.id == clip.id }) else { throw HistoryError.duplicateID }
@@ -117,8 +137,8 @@ public actor SQLiteHistoryRepository: HistoryRepository {
         try Self.execute(database, "BEGIN IMMEDIATE")
         do {
             let result = try work()
+            if let url { try permissionMaintenance(url) }
             try Self.execute(database, "COMMIT")
-            if let url { try Self.restrictPermissions(url) }
             return result
         } catch {
             try? Self.execute(database, "ROLLBACK")
@@ -181,8 +201,14 @@ public actor SQLiteHistoryRepository: HistoryRepository {
         let metadata = try Self.prepare(database, "SELECT value FROM metadata WHERE key='migration'")
         defer { sqlite3_finalize(metadata) }
         var marker: MigrationMarker?
-        if sqlite3_step(metadata) == SQLITE_ROW, let value = Self.text(metadata, 0) {
+        switch metadataStep(metadata) {
+        case SQLITE_ROW:
+            guard let value = Self.text(metadata, 0) else { throw HistoryError.database("Invalid migration metadata") }
             marker = try JSONDecoder().decode(MigrationMarker.self, from: Data(value.utf8))
+        case SQLITE_DONE:
+            break
+        default:
+            throw HistoryError.database("Unable to read migration metadata")
         }
         return HistorySnapshot(recent: recent, favorites: favorites, migration: marker)
     }

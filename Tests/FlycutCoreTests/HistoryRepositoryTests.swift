@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-import FlycutCore
+@testable import FlycutCore
 import SQLite3
 
 final class HistoryRepositoryTests: XCTestCase {
@@ -174,4 +174,146 @@ final class HistoryRepositoryTests: XCTestCase {
         let snapshot = try await service.capture(second)
         XCTAssertEqual(snapshot.recent.map(\.id), [first.id])
     }
+
+    func testConcurrentCapturesThroughOneServiceKeepBothChanges() async throws {
+        let repository = SuspendedReadHistoryRepository()
+        let service = HistoryService(repository: repository)
+        let first = clip("first")
+        let second = clip("second")
+        let firstTask = Task { try await service.capture(first) }
+        let secondTask = Task { try await service.capture(second) }
+        _ = try await firstTask.value
+        _ = try await secondTask.value
+        let final = await repository.current()
+        XCTAssertEqual(Set(final.recent.map(\.id)), Set([first.id, second.id]))
+    }
+
+    func testCapturePreservesMigrationWrittenByDirectRepositoryWriter() async throws {
+        let repository = CoordinatedMigrationRepository()
+        let service = HistoryService(repository: repository)
+        let incoming = clip("new")
+        let marker = MigrationMarker(sourceIdentity: "legacy", importedAt: Date(timeIntervalSince1970: 999))
+        let capture = Task { try await service.capture(incoming) }
+        await repository.waitForOperationStart()
+        try await repository.replaceAll(HistorySnapshot(recent: [clip("imported")], favorites: [], migration: marker))
+        _ = try await capture.value
+        let final = await repository.current()
+        XCTAssertEqual(final.migration, marker)
+        XCTAssertEqual(Set(final.recent.map(\.text)), Set(["new", "imported"]))
+    }
+
+    func testPermissionMaintenanceFailureRollsBackHistoryAndMarker() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let original = clip("original")
+        let marker = MigrationMarker(sourceIdentity: "original-source", importedAt: Date(timeIntervalSince1970: 1))
+        let baseline = try SQLiteHistoryRepository(url: url)
+        try await baseline.replaceAll(HistorySnapshot(recent: [original], favorites: [], migration: marker))
+        let failing = try SQLiteHistoryRepository(url: url, permissionMaintenance: { _ in throw ControlledHistoryFailure.permission }, metadataStep: sqlite3_step)
+        do {
+            try await failing.replaceAll(HistorySnapshot(recent: [clip("replacement")], favorites: [], migration: nil))
+            XCTFail("Expected permission maintenance failure")
+        } catch {
+            let after = try await baseline.snapshot()
+            XCTAssertEqual(after.recent.map(\.id), [original.id])
+            XCTAssertEqual(after.migration, marker)
+        }
+    }
+
+    func testMetadataStepErrorPropagatesAndCannotEraseMigrationMarker() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let marker = MigrationMarker(sourceIdentity: "imported", importedAt: Date(timeIntervalSince1970: 2))
+        let baseline = try SQLiteHistoryRepository(url: url)
+        try await baseline.replaceAll(HistorySnapshot(recent: [], favorites: [], migration: marker))
+        let failing = try SQLiteHistoryRepository(url: url, permissionMaintenance: { _ in }, metadataStep: { _ in SQLITE_IOERR })
+        do {
+            _ = try await failing.snapshot()
+            XCTFail("Expected metadata read failure")
+        } catch {
+            XCTAssertNotNil(error as? HistoryError)
+        }
+        do {
+            _ = try await failing.apply(.insert(clip("must-not-commit")))
+            XCTFail("Expected apply to fail before modifying history")
+        } catch {
+            let after = try await baseline.snapshot()
+            XCTAssertEqual(after.migration, marker)
+            XCTAssertTrue(after.recent.isEmpty)
+        }
+    }
+}
+
+private enum ControlledHistoryFailure: Error { case permission }
+
+private actor SuspendedReadHistoryRepository: HistoryRepository {
+    private var value = HistorySnapshot(recent: [], favorites: [])
+    private var firstRead: CheckedContinuation<HistorySnapshot, Never>?
+
+    func snapshot() async throws -> HistorySnapshot {
+        if let firstRead {
+            self.firstRead = nil
+            firstRead.resume(returning: value)
+            return value
+        }
+        return await withCheckedContinuation { firstRead = $0 }
+    }
+
+    func apply(_ change: HistoryChange) async throws -> HistorySnapshot {
+        throw HistoryError.database("Unsupported test operation")
+    }
+
+    func replaceAll(_ snapshot: HistorySnapshot) async throws { value = snapshot }
+
+    func update(_ body: @Sendable (inout HistorySnapshot) throws -> Void) async throws -> HistorySnapshot {
+        try body(&value)
+        return value
+    }
+
+    func current() -> HistorySnapshot { value }
+}
+
+private actor CoordinatedMigrationRepository: HistoryRepository {
+    private var value = HistorySnapshot(recent: [], favorites: [])
+    private var started = false
+    private var startedWaiter: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+
+    func waitForOperationStart() async {
+        if started { return }
+        await withCheckedContinuation { startedWaiter = $0 }
+    }
+
+    private func waitForMigration() async {
+        started = true
+        startedWaiter?.resume()
+        startedWaiter = nil
+        await withCheckedContinuation { release = $0 }
+    }
+
+    func snapshot() async throws -> HistorySnapshot {
+        let stale = value
+        await waitForMigration()
+        return stale
+    }
+
+    func apply(_ change: HistoryChange) async throws -> HistorySnapshot {
+        throw HistoryError.database("Unsupported test operation")
+    }
+
+    func update(_ body: @Sendable (inout HistorySnapshot) throws -> Void) async throws -> HistorySnapshot {
+        await waitForMigration()
+        try body(&value)
+        return value
+    }
+
+    func replaceAll(_ snapshot: HistorySnapshot) async throws {
+        value = snapshot
+        release?.resume()
+        release = nil
+    }
+
+    func current() -> HistorySnapshot { value }
 }

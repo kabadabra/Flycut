@@ -13,15 +13,13 @@ public actor HistoryService {
 
     @discardableResult
     public func capture(_ clip: Clip, removeDuplicates: Bool = false) async throws -> HistorySnapshot {
-        let before = try await repository.snapshot()
-        guard before.recent.first?.text != clip.text else { return before }
-        var recent = before.recent
-        if removeDuplicates { recent.removeAll { $0.text == clip.text } }
-        recent.insert(clip, at: 0)
-        if recent.count > recentCapacity { recent.removeLast(recent.count - recentCapacity) }
-        let next = HistorySnapshot(recent: recent, favorites: before.favorites, migration: before.migration)
-        try await repository.replaceAll(next)
-        return try await repository.snapshot()
+        let capacity = recentCapacity
+        return try await repository.update { current in
+            guard current.recent.first?.text != clip.text else { return }
+            if removeDuplicates { current.recent.removeAll { $0.text == clip.text } }
+            current.recent.insert(clip, at: 0)
+            if current.recent.count > capacity { current.recent.removeLast(current.recent.count - capacity) }
+        }
     }
 
     public func search(_ query: String) async throws -> [Clip] {
@@ -32,22 +30,22 @@ public actor HistoryService {
 
     @discardableResult
     public func favorite(id: UUID) async throws -> HistorySnapshot {
-        let before = try await repository.snapshot()
-        guard let selected = before.recent.first(where: { $0.id == id }) else { throw HistoryError.missingClip }
-        var favorites = before.favorites
-        favorites.insert(Clip(id: selected.id, text: selected.text, pasteboardType: selected.pasteboardType, sourceAppName: selected.sourceAppName, sourceBundleURL: selected.sourceBundleURL, capturedAt: selected.capturedAt, collection: .favorite, order: 0), at: 0)
-        if favorites.count > favoriteCapacity { favorites.removeLast(favorites.count - favoriteCapacity) }
-        let next = HistorySnapshot(recent: before.recent.filter { $0.id != id }, favorites: favorites, migration: before.migration)
-        try await repository.replaceAll(next)
-        return try await repository.snapshot()
+        let capacity = favoriteCapacity
+        return try await repository.update { current in
+            guard let selected = current.recent.first(where: { $0.id == id }) else { throw HistoryError.missingClip }
+            current.favorites.insert(Clip(id: selected.id, text: selected.text, pasteboardType: selected.pasteboardType, sourceAppName: selected.sourceAppName, sourceBundleURL: selected.sourceBundleURL, capturedAt: selected.capturedAt, collection: .favorite, order: 0), at: 0)
+            if current.favorites.count > capacity { current.favorites.removeLast(current.favorites.count - capacity) }
+            current.recent.removeAll { $0.id == id }
+        }
     }
 
     @discardableResult
     public func mergeAll() async throws -> Clip? {
-        let before = try await repository.snapshot()
-        guard let newest = before.recent.first else { return nil }
-        let merged = Clip(id: UUID(), text: before.recent.reversed().map(\.text).joined(separator: "\n"), pasteboardType: newest.pasteboardType, sourceAppName: nil, sourceBundleURL: nil, capturedAt: Date(), collection: .recent, order: 0)
-        try await repository.replaceAll(HistorySnapshot(recent: [merged], favorites: before.favorites, migration: before.migration))
-        return merged
+        let snapshot = try await repository.update { current in
+            guard let newest = current.recent.first else { return }
+            let merged = Clip(id: UUID(), text: current.recent.reversed().map(\.text).joined(separator: "\n"), pasteboardType: newest.pasteboardType, sourceAppName: nil, sourceBundleURL: nil, capturedAt: Date(), collection: .recent, order: 0)
+            current.recent = [merged]
+        }
+        return snapshot.recent.first
     }
 }
