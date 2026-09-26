@@ -13,7 +13,8 @@ import FlycutPlatform
     private var hotkey: HotkeyService!
     private var paste: PasteService!
     private var shell: MenuBarController!
-    private var previousApp: pid_t?
+    private var pasteTargets = PasteTargetHistory(ownProcessID: ProcessInfo.processInfo.processIdentifier)
+    private var activationObserver: NSObjectProtocol?
     private var pasteTask: Task<Void, Never>?
     private var mutationTask: Task<Void, Never>?
     private var snapshot = HistorySnapshot(recent: [], favorites: [])
@@ -32,7 +33,20 @@ import FlycutPlatform
         history = HistoryService(repository: repository, recentCapacity: settings.recentCapacity, favoriteCapacity: settings.favoriteCapacity)
         super.init()
     }
+    isolated deinit {
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Observe before any Flycut activation. Clicking a persistent panel does
+        // not invoke willPresent, but app B's preceding activation is still kept.
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let processID = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
+            MainActor.assumeIsolated { self?.pasteTargets.observeActivation(processID: processID) }
+        }
+        pasteTargets.observeActivation(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
         monitor = ClipboardMonitor(settings: { [weak self] in self?.settings ?? FlycutSettings() },
                                    topText: { [weak self] in self?.snapshot.recent.first?.text },
                                    onClip: { [weak self] clip in
@@ -119,9 +133,7 @@ import FlycutPlatform
     }
     private func preparePresentation() {
         pasteTask?.cancel()
-        if let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            previousApp = app.processIdentifier
-        }
+        pasteTargets.observeActivation(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
         model.needsAccessibility = !accessibility.isTrusted
         model.presentation = UUID()
     }
@@ -146,7 +158,8 @@ import FlycutPlatform
     private func copyOrPaste(_ mode: PasteMode) {
         guard let clip = model.selection.selected else { return }
         pasteTask?.cancel()
-        let target = previousApp
+        pasteTargets.observeActivation(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+        let target = pasteTargets.previousExternalApp
         if mode == .paste {
             shell.prepareForPaste(sticky: settings.stickyPalette)
         } else if !settings.stickyPalette { shell.dismiss() }

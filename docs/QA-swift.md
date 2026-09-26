@@ -71,3 +71,11 @@ QA used a separate disposable bundle/domain, `com.edynamics.flycut.preview.task7
 The QA app was quit through its own Quit command. Process listing confirmed no FlycutMac remained. The synthetic target was terminated, and disposable QA defaults/database were removed. The original preview state needed no restoration because it was never replaced. The temporary appearance/visibility diagnostics were confined to the isolated QA harness and are absent from the production sources.
 
 Final verification: all 80 XCTest tests pass (58 core, 22 platform); Debug bundle and strict signature check pass. Remaining manual release checks include the blocked status-item anchor, successful authorized paste/sticky focus, full-screen Space, VoiceOver, additional populated navigation keys, actual export contents and merge interactions. Unit tests cover selection boundaries, search identities, keyboard commands, merge order and history actions.
+
+## Sticky target tracking revision — 2026-09-26
+
+The coordinator now listens for workspace app-activation notifications throughout its lifetime and records the latest external process, ignoring Flycut itself. This covers clicking an already-visible sticky panel after switching from app A to app B, without relying on the presentation callback. The action samples the foreground app once more, freezes the recorded target before starting its paste task, and leaves PasteService's cancellation/focus guards intact.
+
+A deterministic synthetic regression models A → Flycut → B → mouse reactivation of Flycut, then activates C during the paste focus wait. It verifies that the request activates/checks B, never redirects to A or C, and emits no paste after B loses focus. Another test verifies that own-app and unknown-foreground events do not erase the last external target. Tests initially failed for the missing target-tracking API, then passed with the implementation.
+
+Final verification: 82 tests pass (58 core, 24 platform); Debug bundle/strict signature pass; Graphify refreshed. No UI or clipboard interaction was needed for this revision, and process check confirms no preview or synthetic target remains running. Authorized real paste with app switching remains a Task 10 release check; the controller retains status-item click/anchoring as the explicitly tracked tooling-blocked gate.

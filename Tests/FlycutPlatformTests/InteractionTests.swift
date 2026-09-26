@@ -131,6 +131,39 @@ import FlycutCore
         XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
     }
 
+    func testStickyMousePasteUsesLatestExternalAppAndFreezesTargetDuringWait() async {
+        var targets = PasteTargetHistory(ownProcessID: 99)
+        targets.observeActivation(processID: 101) // App A before opening the palette.
+        targets.observeActivation(processID: 99)  // Flycut becomes active.
+        XCTAssertEqual(targets.previousExternalApp, 101)
+        targets.observeActivation(processID: 202) // App B while sticky panel remains visible.
+        targets.observeActivation(processID: 99)  // Mouse reactivates the existing palette.
+        let frozenTarget = targets.previousExternalApp
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = {
+            targets.observeActivation(processID: 303)
+            fixture.frontmost = false
+        }
+        let result = await fixture.service.copyOrPaste("synthetic", mode: .paste, previousApp: frozenTarget)
+        XCTAssertEqual(result, .copiedPasteUnavailable)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+        XCTAssertTrue(fixture.actions.contains("activate:202"))
+        XCTAssertTrue(fixture.actions.contains("front:202"))
+        XCTAssertFalse(fixture.actions.contains("activate:101"))
+        XCTAssertFalse(fixture.actions.contains("activate:303"))
+        XCTAssertEqual(targets.previousExternalApp, 303, "A later action must use the newly observed external app")
+    }
+
+    func testOwnActivationAndUnknownForegroundDoNotEraseExternalTarget() {
+        var targets = PasteTargetHistory(ownProcessID: 99)
+        targets.observeActivation(processID: 99)
+        XCTAssertNil(targets.previousExternalApp)
+        targets.observeActivation(processID: 101)
+        targets.observeActivation(processID: nil)
+        targets.observeActivation(processID: 99)
+        XCTAssertEqual(targets.previousExternalApp, 101)
+    }
+
     func testLayoutIsResolvedAfterFocusChanges() async {
         let fixture = PasteFixture(trusted: true)
         fixture.duringWait = { fixture.key = 12 }
