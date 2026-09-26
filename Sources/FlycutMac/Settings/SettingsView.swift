@@ -82,24 +82,29 @@ struct SettingsView: View {
             ShortcutRecorder(hotkey: $model.value.hotkey)
                 .frame(height: 36)
             Button("Reset to Shift–Command–V") { model.value.hotkey = FlycutSettings().hotkey }
+            Toggle("Double-click a clipping to paste (off: copy)", isOn: $model.value.menuSelectionPastes)
+            Text("Single-click selects. Return and the Paste button always paste; Copy always copies.").font(.caption)
             Toggle("Keep palette open after copy or paste", isOn: $model.value.stickyPalette)
             Toggle("Wrap selection at first and last clipping", isOn: $model.value.wraparoundPalette)
             Text("In the palette: arrows or j/k select, Return pastes, Escape closes, f favorites, F switches lists, s exports, S exports the list. Type in search to filter.").font(.callout)
         }.padding()
     }
     private var privacy: some View {
-        Form {
+        ScrollView { VStack(alignment: .leading, spacing: 10) {
             Toggle("Remember capture pause across launches", isOn: $model.value.rememberPause)
             Toggle("Skip password fields", isOn: $model.value.skipPasswordFields)
             Toggle("Skip sensitive clipboard types", isOn: $model.value.skipPasteboardTypes)
             TextField("Skipped types (comma separated)", text: $typesText)
             Toggle("Skip these text lengths", isOn: $model.value.skipPasswordLengths)
             TextField("Lengths (comma separated)", text: $lengthsText)
+            Toggle("Show saved pasteboard type in clipping rows", isOn: $model.value.revealPasteboardTypes)
+            Toggle("Suppress automatic Accessibility reminder", isOn: $model.value.suppressAccessibilityAlert)
+            Text("Copy fallback and the Accessibility Settings link remain available.").font(.caption)
             PermissionView()
-        }.padding()
+        }.padding() }
     }
     private var appearance: some View {
-        Form {
+        ScrollView { Form {
             Picker("Appearance", selection: $model.value.appearance) {
                 Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
             }
@@ -107,8 +112,17 @@ struct SettingsView: View {
                 Text("Clipboard").tag(0); Text("Scissors").tag(1); Text("Text").tag(2)
             }
             Toggle("Show clipping source and date", isOn: $model.value.displayClippingSource)
+            Stepper("Initial preview rows: \(model.value.menuPreviewCount)", value: $model.value.menuPreviewCount, in: 1...1000)
+            Text("Show All, search and keyboard navigation reach the full history.").font(.caption)
             Stepper("Preview characters: \(model.value.previewCharacterCount)", value: $model.value.previewCharacterCount, in: 1...1000)
-        }.padding()
+            TextField("Palette width", value: $model.value.bezelWidth, format: .number)
+            TextField("Palette height", value: $model.value.bezelHeight, format: .number)
+            Text("Minimum 460 × 400 points; constrained to the current screen.").font(.caption)
+            Slider(value: $model.value.bezelAlpha, in: 0...1) { Text("Background opacity") }
+            Text("Adds an opaque backing over the native material; text stays fully opaque.").font(.caption)
+            Toggle("Animate palette opening", isOn: $model.value.popUpAnimation)
+            Text("Animations are disabled when Reduce Motion is on.").font(.caption)
+        }.padding() }
     }
 }
 

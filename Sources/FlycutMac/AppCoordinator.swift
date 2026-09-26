@@ -142,9 +142,7 @@ import FlycutPlatform
         if value.saveMode == .never { sessionStartedNever = true }
         settings = value
         settingsStore.save(value)
-        model.selection.wraparound = value.wraparoundPalette
-        model.showSource = value.displayClippingSource
-        model.previewLength = value.previewCharacterCount
+        model.apply(value)
         history = HistoryService(repository: repository, recentCapacity: value.recentCapacity, favoriteCapacity: value.favoriteCapacity,
                                  archive: value.saveMode == .never ? nil : value.autoSaveToLocation.map(EvictionArchive.init),
                                  archiveRecents: value.saveForgottenClippings, archiveFavorites: value.saveForgottenFavorites)
@@ -177,6 +175,7 @@ import FlycutPlatform
         pasteTask?.cancel()
         pasteTargets.observeActivation(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
         model.needsAccessibility = !accessibility.isTrusted
+        model.showAll = false
         model.presentation = UUID()
     }
     private func perform(_ command: PaletteCommand) {
@@ -213,8 +212,7 @@ import FlycutPlatform
             case .copied: model.message = "Copied."
             case .pasted: model.message = nil
             case .copiedNeedsAccessibility:
-                model.message = "Copied. Allow Accessibility access to paste automatically."
-                model.needsAccessibility = true
+                model.reportAccessibilityDenied()
                 shell.showPanel()
             case .copiedPasteUnavailable:
                 model.message = "Copied. Paste manually in the destination app."

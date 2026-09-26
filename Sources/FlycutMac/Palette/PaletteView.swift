@@ -46,11 +46,12 @@ struct PaletteView: View {
                             Text(model.selection.query.isEmpty ? "No clippings yet" : "No matching clippings")
                                 .foregroundStyle(.secondary).padding(30)
                         }
-                        ForEach(model.selection.clips, id: \.id) { clip in
+                        ForEach(model.visibleClips, id: \.id) { clip in
                             PaletteRow(clip: clip, selected: clip.id == model.selection.selectedID,
-                                       showSource: model.showSource, previewLength: model.previewLength)
+                                       showSource: model.showSource, showType: model.showTypes, previewLength: model.previewLength)
                             .contentShape(Rectangle())
-                            .onTapGesture(count: 2) { model.selection.select(clip.id); model.perform(.paste) }
+                            .onTapGesture(count: 2) { model.selection.select(clip.id); model.activateSelection() }
+                            .accessibilityAction(named: "Activate Clipping") { model.selection.select(clip.id); model.activateSelection() }
                             .onTapGesture { searching = false; model.selection.select(clip.id) }
                             .contextMenu {
                                 Button("Copy") { model.selection.select(clip.id); model.copy() }
@@ -63,6 +64,11 @@ struct PaletteView: View {
                         }
                     }
                 }.onChange(of: model.selection.selectedID) { id in if let id { proxy.scrollTo(id) } }
+                .onChange(of: model.presentation) { _ in if let id = model.selection.selectedID { proxy.scrollTo(id) } }
+                .onAppear { if let id = model.selection.selectedID { proxy.scrollTo(id) } }
+            }
+            if model.visibleClips.count < model.selection.clips.count {
+                Button("Show All \(model.selection.clips.count) Clippings") { model.showAll = true }
             }
             HStack {
                 Button("Copy", action: model.copy).disabled(model.selection.selected == nil)
@@ -73,13 +79,21 @@ struct PaletteView: View {
                 Button { showHelp.toggle() } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("Keyboard help")
             }
             if showHelp {
-                Text("↑/↓ or j/k · Home/End · Page Up/Down · 1–0 select\nReturn paste · Esc close · Delete remove · f favorite · F switch list\ns save selected · S save collection · Tab leave search · ⌘F search\nLetters, digits and Delete edit text while searching.")
+                Text("↑/↓ or j/k · Home/End · Page Up/Down · 1–0 select\nReturn paste · Esc close · Delete remove · f favorite · F switch list\ns save selected · S save collection · Tab leave search · ⌘F search\nDouble-click follows the row action in Settings.\nLetters, digits and Delete edit text while searching.")
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
-        }.padding(16).frame(minWidth: 460, minHeight: 400).background(.regularMaterial)
+        }.padding(16).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Rectangle().fill(.regularMaterial)
+                .overlay(Color(nsColor: .windowBackgroundColor).opacity(model.backgroundOpacity))
+        }
         .onExitCommand { model.perform(.dismiss) }
         .onAppear { searching = true }
         .onChange(of: model.presentation) { _ in searching = true }
+        .alert("Allow automatic paste?", isPresented: $model.showAccessibilityAlert) {
+            Button("Open Accessibility Settings", action: model.accessibility)
+            Button("Keep Using Copy", role: .cancel) {}
+        } message: { Text("Your clipping was copied. Allow Flycut in Accessibility settings to paste into the previous app. You can suppress this reminder in Privacy settings.") }
         .alert("Clear all recent clippings?", isPresented: $confirmClear) {
             Button("Cancel", role: .cancel) {}
             Button("Clear Recents", role: .destructive, action: model.clear)

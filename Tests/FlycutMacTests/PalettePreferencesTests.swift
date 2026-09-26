@@ -1,0 +1,70 @@
+import XCTest
+import AppKit
+import FlycutCore
+@testable import FlycutMac
+
+@MainActor final class PalettePreferencesTests: XCTestCase {
+    func testPreviewLimitNeverHidesSearchOrKeyboardSelection() {
+        let model = PaletteModel()
+        var settings = FlycutSettings(); settings.menuPreviewCount = 2
+        model.apply(settings)
+        let clips = (0..<5).map { Clip(id: UUID(), text: "Synthetic \($0)", pasteboardType: "public.utf8-plain-text", sourceAppName: nil, sourceBundleURL: nil, capturedAt: nil, collection: .recent, order: $0) }
+        model.selection.update(.init(recent: clips, favorites: []))
+        XCTAssertEqual(model.visibleClips.count, 2)
+        model.selection.end()
+        XCTAssertEqual(model.visibleClips.last?.id, clips.last?.id)
+        model.selection.home()
+        model.selection.query = "Synthetic 4"
+        XCTAssertEqual(model.visibleClips.map(\.id), [clips[4].id])
+        model.selection.query = ""
+        model.showAll = true
+        XCTAssertEqual(model.visibleClips.count, 5)
+        XCTAssertEqual(model.selection.clips.count, 5)
+    }
+    func testRowActivationHonorsCopyPreferenceAndDoesNotChangeExplicitPaste() {
+        let model = PaletteModel()
+        var copied = 0; var actions: [PaletteCommand] = []
+        model.copy = { copied += 1 }; model.perform = { actions.append($0) }
+        var settings = FlycutSettings(); settings.menuSelectionPastes = false
+        model.apply(settings); model.activateSelection()
+        XCTAssertEqual(copied, 1); XCTAssertTrue(actions.isEmpty)
+        model.perform(.paste)
+        XCTAssertEqual(actions, [.paste])
+        settings.menuSelectionPastes = true
+        model.apply(settings); model.activateSelection()
+        XCTAssertEqual(copied, 1); XCTAssertEqual(actions, [.paste, .paste])
+    }
+    func testSuppressionKeepsFallbackAndPermissionLinkAndAlertOccursOnce() {
+        let model = PaletteModel()
+        var settings = FlycutSettings(); settings.suppressAccessibilityAlert = true
+        model.apply(settings); model.reportAccessibilityDenied()
+        XCTAssertFalse(model.showAccessibilityAlert)
+        XCTAssertTrue(model.needsAccessibility); XCTAssertNotNil(model.message)
+        settings.suppressAccessibilityAlert = false
+        model.apply(settings); model.reportAccessibilityDenied()
+        XCTAssertTrue(model.showAccessibilityAlert)
+        model.showAccessibilityAlert = false
+        model.reportAccessibilityDenied()
+        XCTAssertFalse(model.showAccessibilityAlert)
+        XCTAssertTrue(model.needsAccessibility)
+    }
+    func testPresentationBoundsRespectUsableMinimumAndSmallScreens() {
+        var settings = FlycutSettings(); settings.bezelWidth = 200; settings.bezelHeight = 160
+        XCTAssertEqual(PalettePresentation.size(settings, available: NSSize(width: 1400, height: 900)), NSSize(width: 460, height: 400))
+        settings.bezelWidth = 1600; settings.bezelHeight = 1200
+        XCTAssertEqual(PalettePresentation.size(settings, available: NSSize(width: 800, height: 600)), NSSize(width: 768, height: 568))
+        XCTAssertEqual(PalettePresentation.size(settings, available: NSSize(width: 400, height: 300)), NSSize(width: 368, height: 268))
+    }
+    func testResizingNearScreenEdgeKeepsEntirePanelVisible() {
+        let screen = NSRect(x: 1000, y: 100, width: 1000, height: 700)
+        let resized = NSRect(x: 1850, y: 650, width: 650, height: 500)
+        XCTAssertEqual(PalettePresentation.constrain(resized, to: screen), NSRect(x: 1334, y: 284, width: 650, height: 500))
+    }
+    func testAnimationRequiresOptInAndRespectsReduceMotion() {
+        var settings = FlycutSettings()
+        XCTAssertFalse(PalettePresentation.animates(settings, reduceMotion: false))
+        settings.popUpAnimation = true
+        XCTAssertTrue(PalettePresentation.animates(settings, reduceMotion: false))
+        XCTAssertFalse(PalettePresentation.animates(settings, reduceMotion: true))
+    }
+}

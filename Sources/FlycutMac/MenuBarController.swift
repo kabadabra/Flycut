@@ -2,12 +2,29 @@ import AppKit
 import SwiftUI
 import FlycutCore
 
+enum PalettePresentation {
+    static func size(_ settings: FlycutSettings, available: NSSize) -> NSSize {
+        NSSize(width: min(max(settings.bezelWidth, 460), max(1, available.width - 32)),
+               height: min(max(settings.bezelHeight, 400), max(1, available.height - 32)))
+    }
+    static func constrain(_ frame: NSRect, to screen: NSRect) -> NSRect {
+        let bounds = screen.insetBy(dx: 16, dy: 16)
+        return NSRect(x: min(max(frame.minX, bounds.minX), max(bounds.minX, bounds.maxX - frame.width)),
+                      y: min(max(frame.minY, bounds.minY), max(bounds.minY, bounds.maxY - frame.height)),
+                      width: frame.width, height: frame.height)
+    }
+    static func animates(_ settings: FlycutSettings, reduceMotion: Bool) -> Bool {
+        settings.popUpAnimation && !reduceMotion
+    }
+}
+
 @MainActor final class MenuBarController: NSObject {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     let popover = NSPopover()
     let panel = PalettePanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 500), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
     var willPresent: () -> Void = {}
     var didDismiss: () -> Void = {}
+    private var settings = FlycutSettings()
     private var keyboard: PaletteKeyboard?
     init(model: PaletteModel) {
         super.init()
@@ -18,6 +35,8 @@ import FlycutCore
         popover.contentSize = NSSize(width: 520, height: 500)
         popover.contentViewController = NSHostingController(rootView: PaletteView(model: model))
         panel.contentViewController = NSHostingController(rootView: PaletteView(model: model))
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         panel.title = "Flycut History"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
@@ -31,13 +50,25 @@ import FlycutCore
         }
     }
     func applyAppearance(_ value: FlycutSettings) {
+        settings = value
+        updatePresentation(screen: panel.screen ?? NSScreen.main)
         let symbols = ["doc.on.clipboard", "scissors", "text.alignleft"]
         item.button?.image = NSImage(systemSymbolName: symbols[value.menuIcon], accessibilityDescription: "Flycut clipboard history")
+    }
+    private func updatePresentation(screen: NSScreen?) {
+        let size = PalettePresentation.size(settings, available: screen?.visibleFrame.size ?? NSSize(width: 1024, height: 768))
+        panel.setContentSize(size)
+        if let frame = screen?.visibleFrame { panel.setFrame(PalettePresentation.constrain(panel.frame, to: frame), display: true) }
+        popover.contentSize = size
+        let animates = PalettePresentation.animates(settings, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        popover.animates = animates
+        panel.animationBehavior = animates ? .utilityWindow : .none
     }
     @objc private func toggle() {
         if popover.isShown || panel.isVisible { dismiss(); return }
         guard let button = item.button else { return }
         willPresent()
+        updatePresentation(screen: button.window?.screen)
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
@@ -46,6 +77,7 @@ import FlycutCore
         willPresent()
         popover.performClose(nil)
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+        updatePresentation(screen: screen)
         if let frame = screen?.visibleFrame {
             panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2, y: frame.midY - panel.frame.height / 2))
         }

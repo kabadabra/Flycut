@@ -11,6 +11,42 @@ import FlycutCore
     @Published var showSource = true
     @Published var previewLength = 40
     @Published var presentation = UUID()
+    @Published var previewCount = 10
+    @Published var showAll = false
+    @Published var showTypes = false
+    @Published var backgroundOpacity = 0.25
+    @Published var showAccessibilityAlert = false
+    private var selectionPastes = true
+    private var suppressAccessibilityAlert = false
+    private var didExplainAccessibility = false
+
+    var visibleClips: [Clip] {
+        let clips = selection.clips
+        guard selection.query.isEmpty, !showAll else { return clips }
+        let selectedCount = clips.firstIndex { $0.id == selection.selectedID }.map { $0 + 1 } ?? 0
+        return Array(clips.prefix(max(previewCount, selectedCount)))
+    }
+    func apply(_ settings: FlycutSettings) {
+        selection.wraparound = settings.wraparoundPalette
+        showSource = settings.displayClippingSource
+        previewLength = settings.previewCharacterCount
+        previewCount = settings.menuPreviewCount
+        showTypes = settings.revealPasteboardTypes
+        backgroundOpacity = settings.bezelAlpha
+        selectionPastes = settings.menuSelectionPastes
+        suppressAccessibilityAlert = settings.suppressAccessibilityAlert
+    }
+    func activateSelection() {
+        if selectionPastes { perform(.paste) } else { copy() }
+    }
+    func reportAccessibilityDenied() {
+        message = "Copied. Allow Accessibility access to paste automatically."
+        needsAccessibility = true
+        if !suppressAccessibilityAlert && !didExplainAccessibility {
+            showAccessibilityAlert = true
+            didExplainAccessibility = true
+        }
+    }
     var perform: (PaletteCommand) -> Void = { _ in }
     var copy: () -> Void = {}
     var pause: () -> Void = {}

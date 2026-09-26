@@ -114,15 +114,15 @@ QA used `/tmp/Flycut Task8 QA.app`, bundle/domain `com.edynamics.flycut.preview.
 
 ### Task 10 implementation and release checklist
 
-The product is **not feature-complete**. Import explicitly warns before confirmation that the following mapped legacy preferences have no current preview effect. Each needs implementation and tests, or an explicit spec-consistent removal/migration rationale:
+The preference implementation gaps below are resolved by the Task 10 revision. The remaining manual and signed-release gates still block publication. Import explains the intentional new palette semantics before confirmation:
 
-- [ ] `menuPreviewCount` / legacy `displayNum`: apply the configured visible menu preview count to the palette/menu presentation without discarding stored clips or hiding searchable history.
-- [ ] `bezelWidth`, `bezelHeight`: apply user dimensions to the palette/popover while preserving usable minimum sizes and screen bounds; expose working controls.
-- [ ] `bezelAlpha`: apply transparency to the palette background without fading text or reducing readability; expose a working control.
-- [ ] `popUpAnimation`: honor the optional presentation animation and Reduce Motion behavior; expose a working control.
-- [ ] `menuSelectionPastes`: specify and implement copy-versus-paste activation semantics for the new palette (including mouse and keyboard) and test prior-app restoration.
-- [ ] `revealPasteboardTypes`: reveal type metadata only through explicit UI, without logging clipboard contents; expose a working control.
-- [ ] `suppressAccessibilityAlert`: define whether this suppresses an automatic prompt while retaining the visible Copy fallback and permission links; the preview currently never issues an automatic Accessibility prompt.
+- [x] `menuPreviewCount` / legacy `displayNum`: apply the configured visible menu preview count to the palette/menu presentation without discarding stored clips or hiding searchable history.
+- [x] `bezelWidth`, `bezelHeight`: apply user dimensions to the palette/popover while preserving usable minimum sizes and screen bounds; expose working controls.
+- [x] `bezelAlpha`: apply transparency to the palette background without fading text or reducing readability; expose a working control.
+- [x] `popUpAnimation`: honor the optional presentation animation and Reduce Motion behavior; expose a working control.
+- [x] `menuSelectionPastes`: specify and implement copy-versus-paste activation semantics for the new palette (including mouse and keyboard) and test prior-app restoration.
+- [x] `revealPasteboardTypes`: reveal type metadata only through explicit UI, without logging clipboard contents; expose a working control.
+- [x] `suppressAccessibilityAlert`: define whether this suppresses an automatic prompt while retaining the visible Copy fallback and permission links; the app now shows one informational reminder per session after denied Paste, unless suppressed; it never automatically requests OS permission.
 - [ ] Real Open at Login registration/approval and permission-grant paths on a disposable signed install. QA used adapter tests and inspected buttons, without changing system permissions or login items.
 - [ ] Native production onboarding with multiple discoverable profiles in a disposable user account, unread-container picker recovery, UI replace flow, actual repaired-database recovery, and an older Flycut-generated profile. Automated fixtures cover these decisions/data shapes but do not replace that release gate.
 - [ ] Repeat complete palette/manual release gates from Task 7: status-item anchoring, authorized paste/sticky focus, VoiceOver, full-screen Space, non-QWERTY input, export/eviction folder interaction, and signing/notarization/downloaded-install checks.
@@ -138,3 +138,30 @@ Recovery now returns the restored snapshot to the settings application path. Its
 Save-never onboarding now inspects the saved database's migration metadata through a read-only SQLite connection and a metadata-only query. It does not call snapshot or restore clipping rows. Missing databases are not created; metadata read/decoding errors propagate and display an explicit warning instead of being treated as no migration. Tests verify a durable marker suppresses production onboarding while the working repository stays empty, marker inspection succeeds even when the clips table is absent, corrupted metadata throws, and an absent database creates no files.
 
 Verification: initial coordinator test run failed for the missing injectable/application APIs. All seven focused coordinator/persistence tests pass after the fixes. Full `swift test` passes **97 XCTest tests** (70 core, 24 platform, 3 coordinator), with zero failures/warnings; Debug build/strict signature and Graphify refresh pass. No GUI app or clipboard monitoring was started for this revision. Existing Task 10 implementation/manual release gates remain open.
+
+
+## Task 10 — Preference behavior and isolated QA — 2026-09-26
+
+All previously retained-but-inactive preferences now affect the UI. Initial unfiltered rows honor `menuPreviewCount`; Show All and search expose the complete history, and keyboard selection expands the preview and scrolls the selected row into view. Stored history and search scope are unchanged. Dimensions apply to both presentation modes with a 460×400 usable minimum and screen bounds, including resizing a visible panel near a screen edge. `bezelAlpha` blends an opaque system background over native material; clipping text is never faded. Optional native presentation animation is disabled by the current Reduce Motion preference on each presentation.
+
+Single-click selects. Double-click and the named accessible Activate Clipping action honor `menuSelectionPastes`. Return and explicit Paste always paste, preserving the design spec; Copy always copies. Both activation paths use the existing prior-app tracking and PasteService focus guards. Help, Settings and the import preview explain these semantics. The reveal-types switch shows each saved clipping's type identifier in its row, not clipboard content or diagnostic logging. Accessibility denial always leaves the copied fallback message and Settings link visible. An informational alert appears once per session unless `suppressAccessibilityAlert` is enabled; it does not request or grant OS permission. Explicit permission buttons remain available.
+
+### Automated verification
+
+Six new `PalettePreferencesTests` cover preview limits/search/keyboard reachability, row activation copy/paste branching with explicit Paste unchanged, suppression retaining fallback and permission access with one reminder per session, usable dimensions on normal/small screens, visible-frame correction after resizing at a screen edge, and animation opt-in/Reduce Motion. Initial runs failed because the production model/presentation APIs were missing; focused green runs and the full suite passed after implementation. Existing platform tests still verify copy emits no paste, denied permission fallback, prior-app restoration, sticky mouse target tracking, focus loss and layout-aware paste.
+
+Final local verification: **103 XCTest tests, zero failures** (70 core, 24 platform, 9 macOS). Debug and universal arm64/x86_64 Release builds pass, with strict ad-hoc signature verification; `scripts/verify-app.sh` verifies production identity/version, both architecture slices and signature. These local bundles are not Developer ID signed or notarized. Graphify was refreshed and generated artifacts remain ignored.
+
+### Manual observations and limits
+
+Used only `/tmp/Flycut Task10 QA.app`, bundle `com.edynamics.flycut.preview.task10qa`, a separate settings suite and its own synthetic six-row SQLite history. Capture was paused before first launch and stayed paused. No production or normal preview settings/history were read or written. No clipboard reads/writes, paste events, permission grants, login changes or installed production app changes were performed.
+
+- Light palette at 650×500 with native material/zero opaque backing: two initial rows and visible type/source metadata were readable. Two Down events selected and revealed Gamma beyond the initial two-row preview. Searching Zeta found the sixth clipping.
+- Appearance controls displayed without clipping. Applying Dark, 520×450 dimensions, nearly opaque backing and animation changed the QA settings and palette. Dark text, metadata, selection, search and footer stayed readable. Animation timing and a real system Reduce Motion toggle were not manually measured; the decision is tested automatically.
+- Hiding type metadata removed it from the palette; source metadata remained. Each row exposed a separate accessible button and named activation action after correcting SwiftUI's merged accessibility text. Full VoiceOver behavior remains a manual gate.
+- Single-click Beta selected it without dismissing or activating. End selected, revealed and scrolled to Zeta; reopening retained Zeta visibly scrolled into view. Actual double-click Copy/Paste and Return paste were not invoked in this pass to avoid changing the user's clipboard; branching and prior-app behavior are covered by model/platform tests, with authorized real paste remaining a release gate.
+- Privacy explanations initially clipped in a Form. Changed to a scrollable vertical layout and verified every explanation/permission button fits in dark mode. Suppression was enabled in QA and the permission link remained visible. Actual denied-paste alert presentation remains a manual gate; model behavior is tested.
+- A bounded status-item check still failed: `cua.getApp("com.apple.systemuiserver")` returned `timeoutReached`; the QA app snapshot exposes windows only. No status-item coordinates were guessed. Anchoring is still unverified.
+- QA quit through its own Quit command; process inspection found no `FlycutMac` remaining. Disposable app/settings/history were removed after the observations.
+
+The unchecked Task 10 release checklist above remains binding: production onboarding in a disposable account, permission/login approval, authorized real paste/sticky focus, full-screen Space, VoiceOver, non-QWERTY input, actual export/eviction interactions, status-item anchoring, remote CI, signing/notarization, downloaded artifact verification and installation all require their documented evidence before publication.
