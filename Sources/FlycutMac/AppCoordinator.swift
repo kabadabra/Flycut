@@ -22,7 +22,7 @@ import FlycutPlatform
     private var registeredHotkey: FlycutHotkey?
     private let accessibility = AccessibilityService()
     private var terminating = false
-    private let login = LoginItemService()
+    private let login: LoginItemService
     private var settingsWindow: NSWindow?
     private var importWindow: NSWindow?
     private var settingsEditor: SettingsModel?
@@ -43,10 +43,12 @@ import FlycutPlatform
     init(bundleIdentifier: String?, storageDirectory: URL? = nil,
          defaultsFactory: (String) -> UserDefaults? = { UserDefaults(suiteName: $0) },
          repository: SQLiteHistoryRepository? = nil,
+         login: LoginItemService = LoginItemService(),
          confirmRecovery: @escaping @MainActor (HistorySnapshot, HistorySnapshot) -> Bool = AppCoordinator.askToRecover) {
         bundleIdentity = bundleIdentifier ?? "com.edynamics.flycut.preview"
         self.storageDirectory = storageDirectory
         self.confirmRecovery = confirmRecovery
+        self.login = login
         // Never write v3 settings into the legacy source preferences domain.
         guard let defaults = defaultsFactory(Self.settingsDomain(for: bundleIdentifier)) else {
             fatalError("Unable to initialize isolated settings storage")
@@ -298,6 +300,7 @@ import FlycutPlatform
     /// Apply the same recovered capacity floor to the editor proposal that will
     /// configure the next capture. A separate later reduction remains possible.
     func applySettings(_ draft: FlycutSettings) async throws -> String? {
+        model.message = nil
         var proposed = draft
         var message: String?
         if proposed.saveMode != .never {
@@ -318,7 +321,8 @@ import FlycutPlatform
             }
         }
         configure(proposed)
-        return model.message ?? message ?? "Changes applied."
+        let currentFeedback = [model.message, message].compactMap { $0 }
+        return currentFeedback.isEmpty ? "Changes applied." : currentFeedback.joined(separator: " ")
     }
 
     private func openSettings() {

@@ -1,8 +1,48 @@
 import XCTest
 import FlycutCore
+import FlycutPlatform
 @testable import FlycutMac
 
 @MainActor final class AppCoordinatorTests: XCTestCase {
+    func testApplyingOrdinarySettingReplacesPreviousPaletteFeedback() async throws {
+        let domain = "flycut.synthetic.feedback." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        var initial = FlycutSettings(); initial.saveMode = .never
+        SettingsStore(defaults: defaults).save(initial)
+        let working = try SQLiteHistoryRepository(inMemory: ())
+        let app = AppCoordinator(bundleIdentifier: "com.edynamics.flycut.preview", defaultsFactory: { _ in defaults }, repository: working)
+        app.model.message = "Copied."
+        var draft = app.settings; draft.stickyPalette.toggle()
+
+        let result = try await app.applySettings(draft)
+        XCTAssertEqual(result, "Changes applied.")
+        XCTAssertEqual(app.settings.stickyPalette, draft.stickyPalette)
+    }
+
+    func testApplyingLoginSettingReportsCurrentApprovalAndFailureAfterPreviousPaletteFeedback() async throws {
+        let cases: [(LoginItemStatus, String, Bool)] = [
+            (.requiresApproval, "Approve Flycut in Login Items Settings.", true),
+            (.error("Synthetic failure"), "Login item change failed. Check Login Items Settings.", false),
+        ]
+        for (status, expected, expectedEnabled) in cases {
+            let domain = "flycut.synthetic.login-feedback." + UUID().uuidString
+            let defaults = UserDefaults(suiteName: domain)!
+            defer { defaults.removePersistentDomain(forName: domain) }
+            var initial = FlycutSettings(); initial.saveMode = .never
+            SettingsStore(defaults: defaults).save(initial)
+            let working = try SQLiteHistoryRepository(inMemory: ())
+            let login = LoginItemService(client: LoginItemClient(status: { status }, register: {}, unregister: {}))
+            let app = AppCoordinator(bundleIdentifier: "com.edynamics.flycut.preview", defaultsFactory: { _ in defaults }, repository: working, login: login)
+            app.model.message = "Copied."
+            var draft = app.settings; draft.openAtLogin = true
+
+            let result = try await app.applySettings(draft)
+            XCTAssertEqual(result, expected)
+            XCTAssertEqual(app.settings.openAtLogin, expectedEnabled)
+        }
+    }
+
     func testProductionShapedStartupAndImportLeaveLegacySourceBytesUnchanged() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let domain = "flycut.synthetic.settings." + UUID().uuidString
