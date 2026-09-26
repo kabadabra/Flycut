@@ -9,7 +9,7 @@ import FlycutCore
             var captured = 0
             let monitor = ClipboardMonitor(pasteboard: board, settings: { FlycutSettings() }, topText: { nil }, onClip: { _ in captured += 1 })
             let client = PasteClient(write: { text in board.text = text; board.changeCount += 2; return board.changeCount },
-                                     isTrusted: { true }, activate: { _ in true },
+                                     changeCount: { board.changeCount }, isTrusted: { true }, activate: { _ in true },
                                      waitForFocus: { monitor.pollOnce() }, isFrontmost: { _ in true },
                                      pasteKeyCode: { 47 }, sendPaste: { _ in true })
             let service = PasteService(client: client, recordSelfWrite: { monitor.recordSelfWrite(changeCount: $0) })
@@ -24,9 +24,12 @@ import FlycutCore
 
     func testAccessibilityAndLoginAdaptersExposeStatusAndErrors() async {
         var opened: URL?
-        let accessibility = AccessibilityService(trust: { prompt in prompt }, open: { opened = $0; return true })
+        var trusted = false
+        let accessibility = AccessibilityService(trust: { _ in trusted }, open: { opened = $0; return true })
         XCTAssertFalse(accessibility.isTrusted)
-        XCTAssertTrue(accessibility.requestPermission())
+        XCTAssertFalse(accessibility.requestPermission())
+        trusted = true
+        XCTAssertTrue(accessibility.isTrusted)
         XCTAssertTrue(accessibility.openSettings())
         XCTAssertTrue(opened?.absoluteString.contains("Privacy_Accessibility") == true)
         let login = LoginItemService(client: LoginItemClient(status: { .requiresApproval }, register: {}, unregister: {}))
@@ -84,6 +87,67 @@ import FlycutCore
         XCTAssertEqual(missing, .copiedPasteUnavailable)
     }
 
+    func testClipboardReplacementDuringWaitDoesNotSendOrOverwrite() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = { fixture.count = 3 }
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .copiedPasteUnavailable)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+        XCTAssertEqual(fixture.actions.filter { $0 == "write" }.count, 1)
+        XCTAssertEqual(fixture.count, 3)
+    }
+
+    func testTrustRevocationDuringWaitDoesNotSend() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = { fixture.trusted = false }
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .copiedNeedsAccessibility)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+    }
+
+    func testCancelledSuspendedPasteDoesNotSend() async {
+        let fixture = PasteFixture(trusted: true)
+        let gate = FocusGate()
+        fixture.duringWait = { await gate.wait() }
+        let task = Task { await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123) }
+        await gate.waitUntilSuspended()
+        task.cancel()
+        gate.resume()
+        let result = await task.value
+        XCTAssertEqual(result, .copiedPasteUnavailable)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+    }
+
+    func testNewCopyInvalidatesSuspendedPaste() async {
+        let fixture = PasteFixture(trusted: true)
+        let gate = FocusGate()
+        fixture.duringWait = { await gate.wait() }
+        let task = Task { await fixture.service.copyOrPaste("first", mode: .paste, previousApp: 123) }
+        await gate.waitUntilSuspended()
+        _ = await fixture.service.copyOrPaste("second", mode: .copy, previousApp: nil)
+        gate.resume()
+        let result = await task.value
+        XCTAssertEqual(result, .copiedPasteUnavailable)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+    }
+
+    func testLayoutIsResolvedAfterFocusChanges() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = { fixture.key = 12 }
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .pasted)
+        XCTAssertTrue(fixture.actions.contains("key:12"))
+        XCTAssertFalse(fixture.actions.contains("key:47"))
+    }
+
+    func testLayoutBecomingUnavailableDuringWaitDoesNotSend() async {
+        let fixture = PasteFixture(trusted: true)
+        fixture.duringWait = { fixture.key = nil }
+        let result = await fixture.service.copyOrPaste("selected", mode: .paste, previousApp: 123)
+        XCTAssertEqual(result, .copiedPasteUnavailable)
+        XCTAssertFalse(fixture.actions.contains(where: { $0.hasPrefix("key:") }))
+    }
+
     func testLayoutMapsCharacterUsingInjectedTranslation() {
         let layout = KeyboardLayout { code in code == 47 ? "v" : "x" }
         XCTAssertEqual(layout.keyCode(for: "v"), 47)
@@ -101,15 +165,18 @@ import FlycutCore
 
 @MainActor private final class PasteFixture {
     var actions: [String] = []
+    var count = 2
     var frontmost = true
     var key: UInt16? = 47
-    let trusted: Bool
+    var trusted: Bool
+    var duringWait: @MainActor () async -> Void = {}
     init(trusted: Bool) { self.trusted = trusted }
     lazy var service = PasteService(client: PasteClient(
         write: { [unowned self] _ in actions.append("write"); return 2 },
+        changeCount: { [unowned self] in count },
         isTrusted: { [unowned self] in trusted },
         activate: { [unowned self] pid in actions.append("activate:\(pid)"); return true },
-        waitForFocus: { [unowned self] in actions.append("wait") },
+        waitForFocus: { [unowned self] in actions.append("wait"); await duringWait() },
         isFrontmost: { [unowned self] pid in actions.append("front:\(pid)"); return frontmost },
         pasteKeyCode: { [unowned self] in key },
         sendPaste: { [unowned self] key in actions.append("key:\(key)"); return true }
@@ -121,4 +188,20 @@ import FlycutCore
     var text = ""
     var advertisedTypes = ["public.utf8-plain-text"]
     func readPlainText() -> PasteboardReadResult { .text(text) }
+}
+
+@MainActor private final class FocusGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var observer: CheckedContinuation<Void, Never>?
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            observer?.resume(); observer = nil
+        }
+    }
+    func waitUntilSuspended() async {
+        if continuation != nil { return }
+        await withCheckedContinuation { observer = $0 }
+    }
+    func resume() { continuation?.resume(); continuation = nil }
 }

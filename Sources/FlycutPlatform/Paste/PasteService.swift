@@ -8,6 +8,7 @@ public enum PasteResult: Equatable, Sendable {
 /// All system effects are injected. A successful write returns the final change count.
 @MainActor public struct PasteClient {
     public var write: (String) -> Int?
+    public var changeCount: () -> Int
     public var isTrusted: () -> Bool
     public var activate: (pid_t) -> Bool
     public var waitForFocus: () async -> Void
@@ -15,11 +16,11 @@ public enum PasteResult: Equatable, Sendable {
     public var pasteKeyCode: () -> UInt16?
     public var sendPaste: (UInt16) -> Bool
 
-    public init(write: @escaping (String) -> Int?, isTrusted: @escaping () -> Bool,
+    public init(write: @escaping (String) -> Int?, changeCount: @escaping () -> Int, isTrusted: @escaping () -> Bool,
                 activate: @escaping (pid_t) -> Bool, waitForFocus: @escaping () async -> Void,
                 isFrontmost: @escaping (pid_t) -> Bool, pasteKeyCode: @escaping () -> UInt16?,
                 sendPaste: @escaping (UInt16) -> Bool) {
-        self.write = write; self.isTrusted = isTrusted; self.activate = activate
+        self.write = write; self.changeCount = changeCount; self.isTrusted = isTrusted; self.activate = activate
         self.waitForFocus = waitForFocus; self.isFrontmost = isFrontmost
         self.pasteKeyCode = pasteKeyCode; self.sendPaste = sendPaste
     }
@@ -30,7 +31,7 @@ public enum PasteResult: Equatable, Sendable {
             board.clearContents()
             guard board.setString(text, forType: .string) else { return nil }
             return board.changeCount
-        }, isTrusted: { AXIsProcessTrusted() }, activate: { pid in
+        }, changeCount: { NSPasteboard.general.changeCount }, isTrusted: { AXIsProcessTrusted() }, activate: { pid in
             guard pid != ProcessInfo.processInfo.processIdentifier,
                   let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return false }
             return app.activate(options: [.activateIgnoringOtherApps])
@@ -65,12 +66,15 @@ public enum PasteResult: Equatable, Sendable {
         recordSelfWrite(count)
         guard mode == .paste else { return .copied }
         guard client.isTrusted() else { return .copiedNeedsAccessibility }
-        guard let pid = previousApp, let code = client.pasteKeyCode(), client.activate(pid) else {
+        guard let pid = previousApp, client.activate(pid) else {
             return .copiedPasteUnavailable
         }
         await client.waitForFocus()
         guard !Task.isCancelled, request == generation, client.isFrontmost(pid) else { return .copiedPasteUnavailable }
         guard client.isTrusted() else { return .copiedNeedsAccessibility }
+        guard let code = client.pasteKeyCode() else { return .copiedPasteUnavailable }
+        // Another process can replace the shared clipboard while focus is settling.
+        guard client.changeCount() == count else { return .copiedPasteUnavailable }
         return client.sendPaste(code) ? .pasted : .copiedPasteUnavailable
     }
 }
