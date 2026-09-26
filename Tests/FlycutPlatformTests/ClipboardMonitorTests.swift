@@ -82,6 +82,41 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertEqual(metadataCalls, 0)
     }
 
+    func testResumeDiscardsCopyMadeWhilePausedBeforeNextPoll() {
+        let board = FakePasteboard(count: 1, result: .text("paused copy"))
+        let sink = ClipSink()
+        let monitor = makeMonitor(board: board, sink: sink)
+        monitor.isPaused = true
+        board.changeCount = 2
+        monitor.isPaused = false
+        monitor.pollOnce()
+        XCTAssertEqual(board.readCount, 0)
+        XCTAssertTrue(sink.clips.isEmpty)
+
+        board.changeCount = 3
+        board.result = .text("after resume")
+        monitor.pollOnce()
+        XCTAssertEqual(sink.clips.map(\.text), ["after resume"])
+    }
+
+    func testPausedPollDiscardsCopyAndLaterCopyIsCaptured() {
+        let board = FakePasteboard(count: 1, result: .text("paused copy"))
+        let sink = ClipSink()
+        let monitor = makeMonitor(board: board, sink: sink)
+        monitor.isPaused = true
+        board.changeCount = 2
+        monitor.pollOnce()
+        XCTAssertEqual(board.readCount, 0)
+        monitor.isPaused = false
+        monitor.pollOnce()
+        XCTAssertEqual(board.readCount, 0)
+
+        board.changeCount = 3
+        board.result = .text("later copy")
+        monitor.pollOnce()
+        XCTAssertEqual(sink.clips.map(\.text), ["later copy"])
+    }
+
     private func makeMonitor(board: FakePasteboard, sink: ClipSink, onDenied: @escaping @MainActor () -> Void = {}) -> ClipboardMonitor {
         let monitor = ClipboardMonitor(
             pasteboard: board,

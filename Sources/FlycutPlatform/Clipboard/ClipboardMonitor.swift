@@ -24,7 +24,12 @@ public struct ClipboardSource: Equatable {
     private var selfWriteCount: Int?
     private var timer: Timer?
 
-    public var isPaused = false
+    public var isPaused = false {
+        didSet {
+            // A copy between paused polls still belongs to the paused interval.
+            if oldValue && !isPaused { observedCount = pasteboard.changeCount }
+        }
+    }
 
     public init(
         pasteboard: any PasteboardClient = SystemPasteboardClient(),

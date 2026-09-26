@@ -6,6 +6,11 @@ public enum PasteboardReadResult: Equatable {
     case denied
 }
 
+enum PasteboardAccessEvidence: Equatable {
+    case alwaysDeny
+    case unknown
+}
+
 /// A small boundary around the system pasteboard; tests provide an in-memory implementation.
 @MainActor public protocol PasteboardClient: AnyObject {
     var changeCount: Int { get }
@@ -24,9 +29,19 @@ public enum PasteboardReadResult: Equatable {
     public var advertisedTypes: [String] { (pasteboard.types ?? []).map(\.rawValue) }
 
     public func readPlainText() -> PasteboardReadResult {
-        if let text = pasteboard.string(forType: .string) { return .text(text) }
-        // A declared text item that cannot be read must not be reported as captured.
-        if pasteboard.availableType(from: [.string]) != nil { return .denied }
-        return .unavailable
+        let text = pasteboard.string(forType: .string)
+        if let text { return Self.classifyRead(text, access: .unknown) }
+        let access: PasteboardAccessEvidence
+        if #available(macOS 15.4, *), pasteboard.accessBehavior == .alwaysDeny {
+            access = .alwaysDeny
+        } else {
+            access = .unknown
+        }
+        return Self.classifyRead(nil, access: access)
+    }
+
+    nonisolated static func classifyRead(_ text: String?, access: PasteboardAccessEvidence) -> PasteboardReadResult {
+        if let text { return .text(text) }
+        return access == .alwaysDeny ? .denied : .unavailable
     }
 }
