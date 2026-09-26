@@ -165,3 +165,11 @@ Used only `/tmp/Flycut Task10 QA.app`, bundle `com.edynamics.flycut.preview.task
 - QA quit through its own Quit command; process inspection found no `FlycutMac` remaining. Disposable app/settings/history were removed after the observations.
 
 The unchecked Task 10 release checklist above remains binding: production onboarding in a disposable account, permission/login approval, authorized real paste/sticky focus, full-screen Space, VoiceOver, non-QWERTY input, actual export/eviction interactions, status-item anchoring, remote CI, signing/notarization, downloaded artifact verification and installation all require their documented evidence before publication.
+
+## Release candidate verification — 2026-09-26
+
+The final reviewed Swift commit `3094174` passed the [macOS build workflow](https://github.com/kabadabra/Flycut/actions/runs/36229688411), including the Swift tests and the legacy Flycut 2.0 build. The [manual release dry run](https://github.com/kabadabra/Flycut/actions/runs/36229695931) signed and notarized the universal Flycut 3.0 app and DMG without publishing a release.
+
+The DMG downloaded from that dry run passed local strict code-signature verification, stapler validation, and Gatekeeper assessment. Its mounted `Flycut.app` passed `scripts/verify-app.sh` with Developer ID and notarization required; the executable contains both arm64 and x86_64 slices. This verifies the downloaded package, not just the runner's build output.
+
+The installed Flycut 2.0 still needs a normal quit before the real production migration. A provisional owner-only backup of its current preferences exists at `~/.config/flycut/backups/2026-09-26-flycut-2.0-com.edynamics.flycut.plist`; a final backup must be taken after quit, because 2.0 may save history on exit. The signed Flycut 3.0 app has not yet been launched against this profile. All remaining UI, permission, migration, and installed-app checks above remain open.

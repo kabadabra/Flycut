@@ -1,15 +1,27 @@
 # Changelog
 
-## 3.0.0 (unreleased)
+## 3.0.0 (2026-09-26)
 
-The Swift rewrite of Flycut, maintained by Emerging Dynamics, remains free and MIT licensed. Requires macOS 13 or later. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
+Flycut 3.0 is a complete Swift rewrite of the free, MIT licensed clipboard manager, maintained by Emerging Dynamics. It supports macOS 13 or later on Apple Silicon and Intel. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
 
-- New searchable SwiftUI palette with an AppKit menu bar and configurable Shift-Command-V shortcut, recent and favorite collections, keyboard help, copy/paste, pause, export, and grouped settings.
-- Swift 6 core, private SQLite history, capture and paste guards, and modern Login Items support.
-- Previewed legacy migration with source backups, explicit destination conflict handling, preserved clipping order and metadata, and privacy-preserving save modes. iCloud sync is unavailable; imported cloud flags never enable it.
-- Production app is Flycut.app (`com.edynamics.flycut`); development preview has separate data. Public builds require Developer ID signing, hardened runtime, notarization and stapling of both app and DMG.
+### What’s new
 
-Before upgrading, quit Flycut 2.0, launch the new app explicitly, review migration, and verify your history before removing Flycut 2.0.app. Both share an identity. Read the [migration guide](readme.md#moving-to-flycut-30). Publication awaits UI, migration and signed installation review.
+- A searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. It includes keyboard help, pause, copy, paste, merge, and text export.
+- Refreshed settings for history, shortcuts, privacy, appearance, and startup behavior. Flycut can remember your chosen pause state and uses the current macOS Login Items system.
+- Local history with private storage and safer clipboard capture. Automatic paste checks Accessibility permission; Copy remains available when paste permission is denied.
+
+### Moving from an older Flycut
+
+- Review a preview of your old clippings and settings before import. Flycut preserves their order and available metadata, makes a private backup of the source, and leaves the original file untouched.
+- Choose how to handle an existing destination and whether imported history stays in memory or is saved. Imported history can raise capacity so clippings are not trimmed during the move.
+- Quit Flycut 2.0 before opening the new app. Verify your imported history before removing the old app. Both versions use the same app identity. See the [upgrade guide](https://github.com/kabadabra/Flycut#moving-to-flycut-30).
+- iCloud sync is unavailable in this fork; imported cloud settings do not enable it.
+
+### For developers
+
+- Swift 6 core with a SwiftUI palette and settings, plus an AppKit shell for menu bar, keyboard, and focus behavior.
+- Versioned SQLite history, separate preview data, and automated tests for migration, capture, paste, settings, and persistence.
+- Universal release builds use Developer ID signing, hardened runtime, notarization, and stapling for the app and DMG.
 
 ### Credits
 
