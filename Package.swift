@@ -23,6 +23,7 @@ let package = Package(
         ),
         .executableTarget(name: "FlycutMac", dependencies: ["FlycutCore", "FlycutPlatform"]),
         .testTarget(name: "FlycutCoreTests", dependencies: ["FlycutCore"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "FlycutMacTests", dependencies: ["FlycutMac", "FlycutCore"]),
         .testTarget(name: "FlycutPlatformTests", dependencies: ["FlycutPlatform", "FlycutCore"]),
     ],
     swiftLanguageModes: [.v6]

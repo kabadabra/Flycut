@@ -4,7 +4,7 @@ public struct SettingsStore {
     private let defaults: UserDefaults
     private let prefix = "v3."
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults) {
         self.defaults = defaults
     }
 

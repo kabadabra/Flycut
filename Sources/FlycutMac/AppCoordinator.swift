@@ -9,7 +9,7 @@ import FlycutPlatform
     private let settingsStore: SettingsStore
     private let repository: SQLiteHistoryRepository
     private var persistence: HistoryPersistence?
-    private var history: HistoryService
+    private(set) var history: HistoryService
     private var monitor: ClipboardMonitor!
     private var hotkey: HotkeyService!
     private var paste: PasteService!
@@ -28,17 +28,42 @@ import FlycutPlatform
     private var settingsEditor: SettingsModel?
     private var migration: MigrationCoordinator?
     private var sessionStartedNever = false
+    private let bundleIdentity: String
+    private let storageDirectory: URL?
+    private let confirmRecovery: @MainActor (HistorySnapshot, HistorySnapshot) -> Bool
     /// Shared settings entry point.
     var showSettings: (() -> Void)?
 
-    override init() {
-        let defaults = Bundle.main.bundleIdentifier == nil ? (UserDefaults(suiteName: "com.edynamics.flycut.preview") ?? .standard) : .standard
+    override convenience init() { self.init(bundleIdentifier: Bundle.main.bundleIdentifier) }
+
+    static func settingsDomain(for bundleIdentifier: String?) -> String {
+        (bundleIdentifier ?? "com.edynamics.flycut.preview") + ".settings.v3"
+    }
+
+    init(bundleIdentifier: String?, storageDirectory: URL? = nil,
+         defaultsFactory: (String) -> UserDefaults? = { UserDefaults(suiteName: $0) },
+         repository: SQLiteHistoryRepository? = nil,
+         confirmRecovery: @escaping @MainActor (HistorySnapshot, HistorySnapshot) -> Bool = AppCoordinator.askToRecover) {
+        bundleIdentity = bundleIdentifier ?? "com.edynamics.flycut.preview"
+        self.storageDirectory = storageDirectory
+        self.confirmRecovery = confirmRecovery
+        // Never write v3 settings into the legacy source preferences domain.
+        guard let defaults = defaultsFactory(Self.settingsDomain(for: bundleIdentifier)) else {
+            fatalError("Unable to initialize isolated settings storage")
+        }
         settingsStore = SettingsStore(defaults: defaults)
         settings = settingsStore.load()
-        do { repository = try SQLiteHistoryRepository() }
+        do { self.repository = try repository ?? SQLiteHistoryRepository() }
         catch { fatalError("Unable to initialize private history storage") }
-        history = HistoryService(repository: repository, recentCapacity: settings.recentCapacity, favoriteCapacity: settings.favoriteCapacity)
+        history = HistoryService(repository: self.repository, recentCapacity: settings.recentCapacity, favoriteCapacity: settings.favoriteCapacity)
         super.init()
+    }
+    private static func askToRecover(_ current: HistorySnapshot, _ saved: HistorySnapshot) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Load previously saved history?"
+        alert.informativeText = "Saved history contains \(saved.recent.count) recent and \(saved.favorites.count) favorite clippings. Loading it replaces this session's \(current.recent.count + current.favorites.count) in-memory clippings. Export any session clippings you need before continuing. Cancel keeps saving disabled."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Load Saved History")
+        return alert.runModal() == .alertSecondButtonReturn
     }
     isolated deinit {
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
@@ -76,8 +101,7 @@ import FlycutPlatform
         enqueue { coordinator in
             if coordinator.settings.saveMode != .never {
                 do {
-                    let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
-                    let directory = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
+                    let directory = try coordinator.supportDirectory()
                     let disk = try SQLiteHistoryRepository(url: directory.appendingPathComponent("history.sqlite"))
                     let persistence = HistoryPersistence(destination: disk)
                     coordinator.persistence = persistence
@@ -87,9 +111,10 @@ import FlycutPlatform
                 }
             }
             coordinator.monitor.start()
-            let restored = try await coordinator.repository.snapshot()
-            if MigrationViewModel.shouldOfferOnboarding(bundleIdentifier: Bundle.main.bundleIdentifier, hasMarker: restored.migration != nil) {
-                coordinator.openImport(discover: true)
+            do {
+                if try await coordinator.shouldOfferMigration() { coordinator.openImport(discover: true) }
+            } catch {
+                coordinator.model.storageWarning = "Previous migration status could not be read. Saved history was left untouched. Use Settings to retry saved history or review an explicit import."
             }
         }
     }
@@ -101,7 +126,7 @@ import FlycutPlatform
     func configure(_ proposed: FlycutSettings) {
         var value = proposed; value.validate()
         let old = registeredHotkey
-        if old != value.hotkey {
+        if let hotkey, old != value.hotkey {
             do { try hotkey.register(value.hotkey); registeredHotkey = value.hotkey }
             catch {
                 if let old, (try? hotkey.register(old)) != nil {
@@ -123,8 +148,8 @@ import FlycutPlatform
         history = HistoryService(repository: repository, recentCapacity: value.recentCapacity, favoriteCapacity: value.favoriteCapacity,
                                  archive: value.saveMode == .never ? nil : value.autoSaveToLocation.map(EvictionArchive.init),
                                  archiveRecents: value.saveForgottenClippings, archiveFavorites: value.saveForgottenFavorites)
-        shell.applyAppearance(value)
-        NSApp.appearance = value.appearance == "system" ? nil : NSAppearance(named: value.appearance == "dark" ? .darkAqua : .aqua)
+        shell?.applyAppearance(value)
+        NSApp?.appearance = value.appearance == "system" ? nil : NSAppearance(named: value.appearance == "dark" ? .darkAqua : .aqua)
     }
     private func wireActions() {
         model.perform = { [weak self] in self?.perform($0) }
@@ -239,14 +264,14 @@ import FlycutPlatform
     }
 
     private func supportDirectory() throws -> URL {
-        let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
-        return try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
+        if let storageDirectory { return storageDirectory }
+        return try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(bundleIdentity, isDirectory: true)
     }
 
     /// Reads a complete disk snapshot before granting writes. A cancelled or failed
     /// recovery leaves the working session and unread destination unchanged.
-    private func prepareSaving(force: Bool = false) async throws -> Bool {
-        if settings.saveMode != .never && persistence != nil && model.storageWarning == nil && !sessionStartedNever && !force { return true }
+    private func prepareSaving(force: Bool = false) async throws -> (ready: Bool, restored: HistorySnapshot?) {
+        if settings.saveMode != .never && persistence != nil && model.storageWarning == nil && !sessionStartedNever && !force { return (true, nil) }
         persistence = nil
         model.storageWarning = "Saving is paused until saved history is loaded successfully. Export session clippings before quitting or retry in Settings."
         let disk = try SQLiteHistoryRepository(url: try supportDirectory().appendingPathComponent("history.sqlite"))
@@ -256,18 +281,46 @@ import FlycutPlatform
         let saved = try await staging.snapshot()
         let current = try await repository.snapshot()
         if !saved.recent.isEmpty || !saved.favorites.isEmpty || saved.migration != nil {
-            let alert = NSAlert()
-            alert.messageText = "Load previously saved history?"
-            alert.informativeText = "Saved history contains \(saved.recent.count) recent and \(saved.favorites.count) favorite clippings. Loading it replaces this session's \(current.recent.count + current.favorites.count) in-memory clippings. Export any session clippings you need before continuing. Cancel keeps saving disabled."
-            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Load Saved History")
-            guard alert.runModal() == .alertSecondButtonReturn else { return false }
+            guard confirmRecovery(current, saved) else { return (false, nil) }
             try await repository.replaceAll(saved)
             settings.recentCapacity = max(settings.recentCapacity, saved.recent.count)
             settings.favoriteCapacity = max(settings.favoriteCapacity, saved.favorites.count)
         }
         configure(settings)
         persistence = gate; sessionStartedNever = false; model.storageWarning = nil
-        return true
+        return (true, (!saved.recent.isEmpty || !saved.favorites.isEmpty || saved.migration != nil) ? saved : nil)
+    }
+
+    func shouldOfferMigration() async throws -> Bool {
+        guard bundleIdentity == "com.edynamics.flycut" else { return false }
+        // Read only marker metadata; save-never must not restore clipboard rows.
+        return try SQLiteHistoryRepository.migrationMarker(at: supportDirectory().appendingPathComponent("history.sqlite")) == nil
+    }
+
+    /// Apply the same recovered capacity floor to the editor proposal that will
+    /// configure the next capture. A separate later reduction remains possible.
+    func applySettings(_ draft: FlycutSettings) async throws -> String? {
+        var proposed = draft
+        var message: String?
+        if proposed.saveMode != .never {
+            let preparation = try await prepareSaving()
+            guard preparation.ready else { return "Changes cancelled. Export session history before loading saved history." }
+            if let restored = preparation.restored {
+                proposed.recentCapacity = max(proposed.recentCapacity, restored.recent.count)
+                proposed.favoriteCapacity = max(proposed.favoriteCapacity, restored.favorites.count)
+            }
+        }
+        if proposed.openAtLogin != settings.openAtLogin {
+            let status = await login.setEnabled(proposed.openAtLogin)
+            switch status {
+            case .registered: proposed.openAtLogin = true
+            case .requiresApproval: message = "Approve Flycut in Login Items Settings."; proposed.openAtLogin = true
+            case .notRegistered: proposed.openAtLogin = false
+            case .notFound, .error: message = "Login item change failed. Check Login Items Settings."; proposed.openAtLogin = settings.openAtLogin
+            }
+        }
+        configure(proposed)
+        return model.message ?? message ?? "Changes applied."
     }
 
     private func openSettings() {
@@ -281,29 +334,15 @@ import FlycutPlatform
             enqueue { coordinator in
                 defer { editor.busy = false; editor.value = coordinator.settings }
                 do {
-                    var proposed = editor.value
-                    if proposed.saveMode != .never {
-                        guard try await coordinator.prepareSaving() else { editor.message = "Changes cancelled. Export session history before loading saved history."; return }
-                    }
-                    if proposed.openAtLogin != coordinator.settings.openAtLogin {
-                        let status = await coordinator.login.setEnabled(proposed.openAtLogin)
-                        switch status {
-                        case .registered: proposed.openAtLogin = true
-                        case .requiresApproval: editor.message = "Approve Flycut in Login Items Settings."; proposed.openAtLogin = true
-                        case .notRegistered: proposed.openAtLogin = false
-                        case .notFound, .error: editor.message = "Login item change failed. Check Login Items Settings."; proposed.openAtLogin = coordinator.settings.openAtLogin
-                        }
-                    }
-                    coordinator.configure(proposed)
-                    editor.message = coordinator.model.message ?? editor.message ?? "Changes applied."
+                    editor.message = try await coordinator.applySettings(editor.value)
                 } catch { editor.message = "Saved history could not be read. It has been left untouched. Export your session, repair the database, then use Retry Saved History." }
             }
         }
-        editor.importLegacy = { [weak self] in self?.openImport(discover: Bundle.main.bundleIdentifier == "com.edynamics.flycut") }
+        editor.importLegacy = { [weak self] in self?.openImport(discover: self?.bundleIdentity == "com.edynamics.flycut") }
         editor.recover = { [weak self, weak editor] in
             self?.enqueue { coordinator in
                 do {
-                    if try await coordinator.prepareSaving(force: true) { editor?.value = coordinator.settings; editor?.message = "Saved history loaded. Choose a save mode and Apply Changes." } else { editor?.message = "Recovery cancelled. Saved history was left untouched; this session remains in memory until recovery succeeds." }
+                    if try await coordinator.prepareSaving(force: true).ready { editor?.value = coordinator.settings; editor?.message = "Saved history loaded. Choose a save mode and Apply Changes." } else { editor?.message = "Recovery cancelled. Saved history was left untouched; this session remains in memory until recovery succeeds." }
                 } catch { editor?.message = "Saved history is still unreadable and was left untouched. Export session clippings before quitting." }
             }
         }
@@ -333,7 +372,7 @@ import FlycutPlatform
                         // Preparing disk history can change the destination: require a new preview.
                         let before = try await owner.repository.snapshot()
                         if acceptedReport?.inMemoryOnly == false {
-                            guard try await owner.prepareSaving() else { editor.decision.failed(); editor.error = "Import cancelled before any source or history was changed."; return }
+                            guard try await owner.prepareSaving().ready else { editor.decision.failed(); editor.error = "Import cancelled before any source or history was changed."; return }
                             let after = try await owner.repository.snapshot()
                             if before != after { editor.decision.failed(); editor.preview(); return }
                         }

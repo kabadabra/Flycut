@@ -3,6 +3,30 @@ import SQLite3
 @testable import FlycutCore
 
 final class HistoryPersistenceTests: XCTestCase {
+    func testMarkerInspectionDoesNotReadClipsAndDoesNotHideCorruptMetadata() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("history.sqlite")
+        let disk = try SQLiteHistoryRepository(url: url)
+        let marker = MigrationMarker(sourceIdentity: "synthetic", importedAt: Date(timeIntervalSince1970: 123))
+        try await disk.replaceAll(HistorySnapshot(recent: [], favorites: [], migration: marker))
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
+        defer { sqlite3_close(db) }
+        XCTAssertEqual(sqlite3_exec(db, "DROP TABLE clips", nil, nil, nil), SQLITE_OK)
+        // A full snapshot would fail here. Metadata inspection still succeeds.
+        XCTAssertEqual(try SQLiteHistoryRepository.migrationMarker(at: url)?.sourceIdentity, marker.sourceIdentity)
+        XCTAssertEqual(sqlite3_exec(db, "UPDATE metadata SET value='invalid-json' WHERE key='migration'", nil, nil, nil), SQLITE_OK)
+        XCTAssertThrowsError(try SQLiteHistoryRepository.migrationMarker(at: url))
+        XCTAssertEqual(sqlite3_exec(db, "DELETE FROM metadata WHERE key='migration'", nil, nil, nil), SQLITE_OK)
+        XCTAssertNil(try SQLiteHistoryRepository.migrationMarker(at: url))
+    }
+    func testMarkerInspectionDoesNotCreateAbsentDatabase() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = folder.appendingPathComponent("history.sqlite")
+        XCTAssertNil(try SQLiteHistoryRepository.migrationMarker(at: url))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    }
     func testMalformedSavedMetadataSurvivesRestoreFailureAndQuitSave() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

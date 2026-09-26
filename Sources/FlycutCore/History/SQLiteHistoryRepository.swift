@@ -85,6 +85,26 @@ public actor SQLiteHistoryRepository: HistoryRepository {
 
     deinit { sqlite3_close(database) }
 
+    /// Inspect durable migration metadata without reading clipping rows, creating
+    /// a database, changing permissions, or enabling a writable connection.
+    public static func migrationMarker(at url: URL) throws -> MigrationMarker? {
+        do { _ = try FileManager.default.attributesOfItem(atPath: url.path) }
+        catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile { return nil }
+        var handle: OpaquePointer?
+        let status = sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil)
+        defer { if let handle { sqlite3_close(handle) } }
+        guard status == SQLITE_OK, let handle else { throw HistoryError.database("Unable to inspect migration metadata") }
+        let statement = try prepare(handle, "SELECT value FROM metadata WHERE key='migration'")
+        defer { sqlite3_finalize(statement) }
+        switch sqlite3_step(statement) {
+        case SQLITE_DONE: return nil
+        case SQLITE_ROW:
+            guard let value = text(statement, 0) else { throw HistoryError.database("Invalid migration metadata") }
+            return try JSONDecoder().decode(MigrationMarker.self, from: Data(value.utf8))
+        default: throw HistoryError.database("Unable to read migration metadata")
+        }
+    }
+
     public func snapshot() throws -> HistorySnapshot { try readSnapshot() }
 
     public func apply(_ change: HistoryChange) throws -> HistorySnapshot {
