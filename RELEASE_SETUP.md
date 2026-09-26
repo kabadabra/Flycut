@@ -1,6 +1,6 @@
 # Releasing Flycut 3.0
 
-The [release workflow](.github/workflows/release.yml) builds the Swift package on the configured `xcode-27` runner with Xcode 27.0, runs tests, bundles `Flycut.app`, signs with Developer ID and hardened runtime, notarizes/staples the app, then creates, signs, notarizes/staples and validates `Flycut.dmg`. It also mounts the image read-only and verifies the app inside it. This runner label must be available in the repository; it is not the `macos-latest` label.
+The [release workflow](.github/workflows/release.yml) builds the Swift package on the configured `xcode-27` runner with Xcode 27.0, runs tests, bundles a universal arm64/x86_64 `Flycut.app`, signs with Developer ID and hardened runtime, notarizes/staples the app, then creates, signs, notarizes/staples and validates `Flycut.dmg`. It also mounts the image read-only and verifies the app inside it. This runner label must be available in the repository; it is not the `macos-latest` label.
 
 Publication requires a push of a tag matching exactly `vX.Y.Z`. A manual `workflow_dispatch` is always a **nonpublishing signed dry run**, even when run against a tag. Both paths require all signing/notarization credentials; missing credentials fail rather than producing a public-looking unsigned artifact. Local ad hoc builds remain available through `scripts/build-app.sh`.
 
@@ -48,7 +48,7 @@ VERSION=3.0.0 REQUIRE_DEVELOPER_ID=1 REQUIRE_NOTARIZATION=1 \
   scripts/verify-app.sh /Volumes/Flycut/Flycut.app
 ```
 
-`verify-app.sh` checks the production bundle/executable, version, macOS floor, icon and signature. Release mode also requires Developer ID Application authority, team `M2L9SL9WCS`, hardened runtime, timestamp, valid stapled ticket and Gatekeeper acceptance. A local ad hoc verification does not establish notarization or installation readiness.
+`verify-app.sh` checks the production bundle/executable, version, macOS floor, arm64 and x86_64 executable slices, icon and signature. Release mode also requires Developer ID Application authority, team `M2L9SL9WCS`, hardened runtime, timestamp, valid stapled ticket and Gatekeeper acceptance. A local ad hoc verification does not establish notarization or installation readiness.
 
 ## Publish after approval
 

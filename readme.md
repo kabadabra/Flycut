@@ -8,7 +8,7 @@ Flycut 3.0 is the Swift rewrite under release review. Its public release is gate
 
 Copy text normally, then open the searchable palette from the menu bar or **Shift-Command-V**. Switch between recent clips and favorites, pause capture, copy or paste a selection, export text, or adjust the grouped settings. Keyboard help is available in the palette: arrows and j/k, Home/End, Page Up/Down, digits, Return to paste, Escape to dismiss, Delete, f/F favorites actions, and s/S export. Letter shortcuts do not interfere with typing in search.
 
-Flycut 3.0 requires **macOS 13 or later**. It stores local history; **iCloud/CloudKit sync is not configured or available**. Allow clipboard access when macOS asks. Pasting into another app requires Accessibility permission in System Settings > Privacy & Security > Accessibility. Without that permission, you can still copy a clip and paste it yourself.
+Flycut 3.0 requires **macOS 13 or later**, on Apple Silicon or Intel. Release bundles contain both architectures. It stores local history; **iCloud/CloudKit sync is not configured or available**. Allow clipboard access when macOS asks. Pasting into another app requires Accessibility permission in System Settings > Privacy & Security > Accessibility. Without that permission, you can still copy a clip and paste it yourself.
 
 ## Build locally
 

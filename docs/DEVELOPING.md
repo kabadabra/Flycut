@@ -11,7 +11,7 @@ scripts/build-app.sh release
 scripts/verify-app.sh build/Export/Flycut.app
 ```
 
-Debug produces `build/Preview/Flycut Preview.app`, using a separate preview identity. Release produces `build/Export/Flycut.app` with the production identity. Neither script launches or installs the app. `VERSION=X.Y.Z` overrides both bundle version fields; otherwise they use `App/AppInfo.plist`. Local builds are ad hoc signed. CI runs tests and both builds on Xcode 27, plus bundle verification.
+Debug produces `build/Preview/Flycut Preview.app`, using a separate preview identity. Release builds both arm64 and x86_64 and produces a universal `build/Export/Flycut.app` with the production identity. Debug previews use the host architecture. Neither script launches or installs the app. `VERSION=X.Y.Z` overrides both bundle version fields; otherwise they use `App/AppInfo.plist`. Local builds are ad hoc signed. CI runs tests and both builds on Xcode 27, plus bundle verification.
 
 Legacy Objective-C, bundled libraries and iOS sources remain historical source outside Package.swift. A separate `legacy-2` CI job continues to check the old Xcode project until Swift QA passes; remove that job only after migration, UI and installation review. Release automation already packages the Swift app.
 

@@ -15,6 +15,9 @@ expect "$(read_plist CFBundleExecutable)" FlycutMac executable
 expect "$(read_plist LSMinimumSystemVersion)" 13.0 'minimum macOS'
 expect "$(read_plist CFBundleName)" Flycut 'app name'
 [[ -x "$app/Contents/MacOS/FlycutMac" && -f "$app/Contents/Resources/flycut.icns" ]]
+for required_arch in arm64 x86_64; do
+    lipo "$app/Contents/MacOS/FlycutMac" -verify_arch "$required_arch"
+done
 codesign --verify --deep --strict --verbose=2 "$app"
 if [[ ${REQUIRE_DEVELOPER_ID:-0} == 1 || ${REQUIRE_NOTARIZATION:-0} == 1 ]]; then
     signature=$(codesign -d --verbose=4 "$app" 2>&1)

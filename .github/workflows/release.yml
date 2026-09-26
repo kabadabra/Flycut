@@ -98,8 +98,8 @@ jobs:
         APP=build/Export/Flycut.app
         codesign --force --keychain "$RUNNER_TEMP/build.keychain" --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
         REQUIRE_DEVELOPER_ID=1 scripts/verify-app.sh "$APP"
-        printf '%s' "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary_key.p8"
         trap 'rm -f "$RUNNER_TEMP/notary_key.p8"' EXIT
+        printf '%s' "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary_key.p8"
         ditto -c -k --keepParent "$APP" build/Flycut.zip
         xcrun notarytool submit build/Flycut.zip --key "$RUNNER_TEMP/notary_key.p8" \
           --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
@@ -130,9 +130,11 @@ jobs:
         trap 'hdiutil detach "$MOUNT"' EXIT
         REQUIRE_DEVELOPER_ID=1 REQUIRE_NOTARIZATION=1 scripts/verify-app.sh "$MOUNT/Flycut.app"
 
-    - name: Clean up keychain
+    - name: Clean up signing credentials
       if: always()
-      run: security delete-keychain "$RUNNER_TEMP/build.keychain" 2>/dev/null || true
+      run: |
+        rm -f "$RUNNER_TEMP/notary_key.p8" "$RUNNER_TEMP/flycut-certificate.p12"
+        security delete-keychain "$RUNNER_TEMP/build.keychain" 2>/dev/null || true
 
     - name: Assemble release notes
       env:

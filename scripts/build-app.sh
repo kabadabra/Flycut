@@ -28,15 +28,37 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 2
 fi
 
-swift build -c "$configuration" --product FlycutMac
-binary_dir=$(swift build -c "$configuration" --show-bin-path)
-
 mkdir -p "$(dirname "$destination")"
 staging=$(mktemp -d "$root/build/.flycut-app.XXXXXX")
 trap 'rm -rf "$staging"' EXIT
 app="$staging/$app_name.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-install -m 755 "$binary_dir/FlycutMac" "$app/Contents/MacOS/FlycutMac"
+if [[ $mode == release ]]; then
+    # Build each supported CPU explicitly; the host architecture must not decide
+    # which Macs can run a public release.
+    binaries=()
+    for arch in arm64 x86_64; do
+        triple="$arch-apple-macosx13.0"
+        swift build -c release --triple "$triple" --product FlycutMac
+        binary_dir=$(swift build -c release --triple "$triple" --show-bin-path)
+        # Xcode's SwiftPM build system can reuse one output path across triples.
+        # Preserve each slice before the next build overwrites that path.
+        slice="$staging/FlycutMac-$arch"
+        install -m 755 "$binary_dir/FlycutMac" "$slice"
+        lipo "$slice" -verify_arch "$arch"
+        binaries+=("$slice")
+    done
+    lipo -create "${binaries[@]}" -output "$app/Contents/MacOS/FlycutMac"
+    chmod 755 "$app/Contents/MacOS/FlycutMac"
+    # Fail before signing or replacing the previous output if either is absent.
+    for required_arch in arm64 x86_64; do
+        lipo "$app/Contents/MacOS/FlycutMac" -verify_arch "$required_arch"
+    done
+else
+    swift build -c "$configuration" --product FlycutMac
+    binary_dir=$(swift build -c "$configuration" --show-bin-path)
+    install -m 755 "$binary_dir/FlycutMac" "$app/Contents/MacOS/FlycutMac"
+fi
 install -m 644 "$root/App/AppInfo.plist" "$app/Contents/Info.plist"
 install -m 644 "$root/flycut.icns" "$app/Contents/Resources/flycut.icns"
 
