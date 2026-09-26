@@ -17,6 +17,9 @@ public struct FlycutHotkey: Codable, Equatable, Sendable {
 }
 
 public struct FlycutSettings: Codable, Equatable, Sendable {
+    public var rememberPause = false
+    public var capturePaused = false
+    public var appearance = "system"
     public var recentCapacity = 40
     public var favoriteCapacity = 40
     public var menuPreviewCount = 10
@@ -52,6 +55,7 @@ public struct FlycutSettings: Codable, Equatable, Sendable {
     public init() {}
 
     public mutating func validate() {
+        if !["system", "light", "dark"].contains(appearance) { appearance = "system" }
         if recentCapacity < 1 { recentCapacity = 40 }
         if favoriteCapacity < 1 { favoriteCapacity = 40 }
         if menuPreviewCount < 1 { menuPreviewCount = 10 }

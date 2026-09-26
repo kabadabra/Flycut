@@ -3,6 +3,18 @@ import XCTest
 @testable import FlycutCore
 
 final class SettingsTests: XCTestCase {
+    func testRememberPauseAndAppearanceRoundTrip() {
+        let name = "flycut.synthetic." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = SettingsStore(defaults: defaults)
+        var settings = FlycutSettings()
+        settings.rememberPause = true; settings.capturePaused = true; settings.appearance = "dark"
+        store.save(settings)
+        XCTAssertTrue(store.load().rememberPause)
+        XCTAssertTrue(store.load().capturePaused)
+        XCTAssertEqual(store.load().appearance, "dark")
+    }
     func testLegacyDefaultsMatchUserFacingControls() {
         let settings = LegacySettingsMapper.map([:]).settings
         XCTAssertEqual(settings.recentCapacity, 40)

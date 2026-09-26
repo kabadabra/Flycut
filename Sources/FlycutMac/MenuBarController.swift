@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import FlycutCore
 
 @MainActor final class MenuBarController: NSObject {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -28,6 +29,10 @@ import SwiftUI
             guard let self, let window else { return false }
             return window === self.panel || window === self.popover.contentViewController?.view.window
         }
+    }
+    func applyAppearance(_ value: FlycutSettings) {
+        let symbols = ["doc.on.clipboard", "scissors", "text.alignleft"]
+        item.button?.image = NSImage(systemSymbolName: symbols[value.menuIcon], accessibilityDescription: "Flycut clipboard history")
     }
     @objc private func toggle() {
         if popover.isShown || panel.isVisible { dismiss(); return }

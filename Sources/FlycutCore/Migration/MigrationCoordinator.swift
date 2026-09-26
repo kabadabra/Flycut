@@ -1,22 +1,25 @@
 import Foundation
 import Darwin
+import CryptoKit
 
 public actor MigrationCoordinator {
     private let destination: any HistoryRepository
     private let backupDirectory: URL
     public private(set) var activeRepository: any HistoryRepository
-    private var memoryRepository: SQLiteHistoryRepository?
+    private var memoryRepository: (any HistoryRepository)?
     private var importing = false
     private var memoryBackups: [String: (Data, HistorySnapshot)] = [:]
 
-    public init(destination: any HistoryRepository, backupDirectory: URL) {
+    public init(destination: any HistoryRepository, backupDirectory: URL, memoryDestination: (any HistoryRepository)? = nil) {
+        self.memoryRepository = memoryDestination
         self.destination = destination
         self.activeRepository = destination
         self.backupDirectory = backupDirectory
     }
 
     public func preview(source: LegacySource, destination: (any HistoryRepository)? = nil, choice: MigrationChoice = .importNew, persistentSaveMode: SaveMode? = nil) async throws -> MigrationReport {
-        var parsed = try LegacyStoreParser.parse(data: Data(contentsOf: source.url))
+        let data = try Data(contentsOf: source.url)
+        var parsed = try LegacyStoreParser.parse(data: data)
         if let persistentSaveMode, persistentSaveMode != .never { parsed.settings.saveMode = persistentSaveMode }
         let history: HistorySnapshot
         if let destination {
@@ -27,6 +30,8 @@ public actor MigrationCoordinator {
             history = try await self.destination.snapshot()
         }
         var report = Self.report(source: source, parsed: parsed, destination: history)
+        report.sourceFingerprint = Self.fingerprint(data)
+        report.destinationFingerprint = try Self.fingerprint(history)
         report.alreadyImported = Self.contains(history.migration, source: source)
         if case .merge = choice, !report.alreadyImported {
             report.settings.recentCapacity = max(report.settings.recentCapacity, history.recent.count + report.recentCount)
@@ -41,11 +46,12 @@ public actor MigrationCoordinator {
     /// A persistent mode is an explicit user opt-in when the legacy save mode is never.
     /// Adopt activeRepository and report.settingsForAdoption(preserving: currentSettings)
     /// together. No-op imports retain current settings and only raise insufficient capacities.
-    public func `import`(source: LegacySource, choice: MigrationChoice, persistentSaveMode: SaveMode? = nil) async throws -> MigrationReport {
+    public func `import`(source: LegacySource, choice: MigrationChoice, persistentSaveMode: SaveMode? = nil, expectedSourceFingerprint: String? = nil, expectedDestinationFingerprint: String? = nil) async throws -> MigrationReport {
         guard !importing else { throw MigrationError.importInProgress }
         importing = true
         defer { importing = false }
         let data = try Data(contentsOf: source.url)
+        if let expectedSourceFingerprint, expectedSourceFingerprint != Self.fingerprint(data) { throw MigrationError.previewChanged }
         var parsed = try LegacyStoreParser.parse(data: data)
         if let persistentSaveMode, persistentSaveMode != .never { parsed.settings.saveMode = persistentSaveMode }
         guard !parsed.history.recent.isEmpty || !parsed.history.favorites.isEmpty else { throw MigrationError.nothingImportable }
@@ -56,7 +62,10 @@ public actor MigrationCoordinator {
             target = memoryRepository!
         } else { target = destination }
         let before = try await target.snapshot()
+        if let expectedDestinationFingerprint, expectedDestinationFingerprint != (try Self.fingerprint(before)) { throw MigrationError.previewChanged }
         var report = Self.report(source: source, parsed: parsed, destination: before)
+        report.sourceFingerprint = Self.fingerprint(data)
+        report.destinationFingerprint = try Self.fingerprint(before)
         if Self.contains(before.migration, source: source) {
             report.alreadyImported = true
             activeRepository = target
@@ -70,6 +79,7 @@ public actor MigrationCoordinator {
         let imported = parsed.history
         let timestamp = Date()
         let result = try await target.update { current in
+            if let expectedDestinationFingerprint, expectedDestinationFingerprint != (try Self.fingerprint(current)) { throw MigrationError.previewChanged }
             if Self.contains(current.migration, source: source) { return }
             try Self.validate(choice, destination: current)
             if !memoryOnly && (!current.recent.isEmpty || !current.favorites.isEmpty) {
@@ -94,6 +104,12 @@ public actor MigrationCoordinator {
         }
         activeRepository = target
         return report
+    }
+
+    private static func fingerprint(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    private static func fingerprint(_ snapshot: HistorySnapshot) throws -> String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        return fingerprint(try encoder.encode(snapshot))
     }
 
     private static func contains(_ marker: MigrationMarker?, source: LegacySource) -> Bool {

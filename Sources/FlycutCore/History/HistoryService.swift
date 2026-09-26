@@ -4,8 +4,12 @@ public actor HistoryService {
     private let repository: any HistoryRepository
     private let recentCapacity: Int
     private let favoriteCapacity: Int
+    private let archive: EvictionArchive?
+    private let archiveRecents: Bool
+    private let archiveFavorites: Bool
 
-    public init(repository: any HistoryRepository, recentCapacity: Int = 40, favoriteCapacity: Int = 40) {
+    public init(repository: any HistoryRepository, recentCapacity: Int = 40, favoriteCapacity: Int = 40, archive: EvictionArchive? = nil, archiveRecents: Bool = false, archiveFavorites: Bool = false) {
+        self.archive = archive; self.archiveRecents = archiveRecents; self.archiveFavorites = archiveFavorites
         self.repository = repository
         self.recentCapacity = max(0, recentCapacity)
         self.favoriteCapacity = max(0, favoriteCapacity)
@@ -14,11 +18,15 @@ public actor HistoryService {
     @discardableResult
     public func capture(_ clip: Clip, removeDuplicates: Bool = false) async throws -> HistorySnapshot {
         let capacity = recentCapacity
+        let archive = archiveRecents ? archive : nil
         return try await repository.update { current in
             guard current.recent.first?.text != clip.text else { return }
             if removeDuplicates { current.recent.removeAll { $0.text == clip.text } }
             current.recent.insert(clip, at: 0)
-            if current.recent.count > capacity { current.recent.removeLast(current.recent.count - capacity) }
+            if current.recent.count > capacity {
+                try archive?.save(Array(current.recent.suffix(current.recent.count - capacity)))
+                current.recent.removeLast(current.recent.count - capacity)
+            }
         }
     }
 
@@ -31,10 +39,14 @@ public actor HistoryService {
     @discardableResult
     public func favorite(id: UUID) async throws -> HistorySnapshot {
         let capacity = favoriteCapacity
+        let archive = archiveFavorites ? archive : nil
         return try await repository.update { current in
             guard let selected = current.recent.first(where: { $0.id == id }) else { throw HistoryError.missingClip }
             current.favorites.insert(Clip(id: selected.id, text: selected.text, pasteboardType: selected.pasteboardType, sourceAppName: selected.sourceAppName, sourceBundleURL: selected.sourceBundleURL, capturedAt: selected.capturedAt, collection: .favorite, order: 0), at: 0)
-            if current.favorites.count > capacity { current.favorites.removeLast(current.favorites.count - capacity) }
+            if current.favorites.count > capacity {
+                try archive?.save(Array(current.favorites.suffix(current.favorites.count - capacity)))
+                current.favorites.removeLast(current.favorites.count - capacity)
+            }
             current.recent.removeAll { $0.id == id }
         }
     }

@@ -21,6 +21,10 @@ import Carbon
             return String(utf16CodeUnits: chars, count: length)
         }
     }
+    public func label(for keyCode: Int) -> String {
+        guard (0...127).contains(keyCode) else { return "Unknown key" }
+        return translate(UInt16(keyCode))?.uppercased() ?? "Key \(keyCode)"
+    }
     public func keyCode(for character: String) -> UInt16? {
         (UInt16(0)...UInt16(127)).first { translate($0)?.lowercased() == character.lowercased() }
     }

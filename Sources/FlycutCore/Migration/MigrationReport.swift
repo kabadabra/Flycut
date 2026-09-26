@@ -46,6 +46,8 @@ public struct MigrationReport: Sendable {
     public var settings: FlycutSettings
     public let skipped: [SkippedLegacyRecord]
     public var warnings: [String]
+    public var sourceFingerprint = ""
+    public var destinationFingerprint = ""
     public var importedCount = 0
     public var alreadyImported = false
     public var inMemoryOnly: Bool
@@ -70,6 +72,7 @@ public enum MigrationChoice: Sendable {
 }
 
 public enum MigrationError: Error, Equatable, Sendable {
+    case previewChanged
     case absentStore
     case invalidPropertyList
     case nothingImportable

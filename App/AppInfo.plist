@@ -24,6 +24,8 @@
     <string>3.0.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT license. Emerging Dynamics. Based on TermiT/Flycut and Jumpcut.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

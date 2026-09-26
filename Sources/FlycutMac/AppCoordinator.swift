@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import FlycutCore
 import FlycutPlatform
 
@@ -21,7 +22,13 @@ import FlycutPlatform
     private var registeredHotkey: FlycutHotkey?
     private let accessibility = AccessibilityService()
     private var terminating = false
-    /// Task 8 replaces this entry point with the grouped settings window.
+    private let login = LoginItemService()
+    private var settingsWindow: NSWindow?
+    private var importWindow: NSWindow?
+    private var settingsEditor: SettingsModel?
+    private var migration: MigrationCoordinator?
+    private var sessionStartedNever = false
+    /// Shared settings entry point.
     var showSettings: (() -> Void)?
 
     override init() {
@@ -59,6 +66,10 @@ import FlycutPlatform
         shell.willPresent = { [weak self] in self?.preparePresentation() }
         shell.didDismiss = { [weak self] in self?.pasteTask?.cancel() }
         hotkey = HotkeyService { [weak self] in self?.shell.showPanel() }
+        model.isPaused = settings.rememberPause && settings.capturePaused
+        monitor.isPaused = model.isPaused
+        sessionStartedNever = settings.saveMode == .never
+        showSettings = { [weak self] in self?.openSettings() }
         wireActions()
         configure(settings)
         // The monitor has already recorded the launch count without reading clipboard text.
@@ -76,6 +87,10 @@ import FlycutPlatform
                 }
             }
             coordinator.monitor.start()
+            let restored = try await coordinator.repository.snapshot()
+            if MigrationViewModel.shouldOfferOnboarding(bundleIdentifier: Bundle.main.bundleIdentifier, hasMarker: restored.migration != nil) {
+                coordinator.openImport(discover: true)
+            }
         }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -98,12 +113,18 @@ import FlycutPlatform
                 }
             }
         }
+        value.capturePaused = model.isPaused
+        if value.saveMode == .never { sessionStartedNever = true }
         settings = value
         settingsStore.save(value)
         model.selection.wraparound = value.wraparoundPalette
         model.showSource = value.displayClippingSource
         model.previewLength = value.previewCharacterCount
-        history = HistoryService(repository: repository, recentCapacity: value.recentCapacity, favoriteCapacity: value.favoriteCapacity)
+        history = HistoryService(repository: repository, recentCapacity: value.recentCapacity, favoriteCapacity: value.favoriteCapacity,
+                                 archive: value.saveMode == .never ? nil : value.autoSaveToLocation.map(EvictionArchive.init),
+                                 archiveRecents: value.saveForgottenClippings, archiveFavorites: value.saveForgottenFavorites)
+        shell.applyAppearance(value)
+        NSApp.appearance = value.appearance == "system" ? nil : NSAppearance(named: value.appearance == "dark" ? .darkAqua : .aqua)
     }
     private func wireActions() {
         model.perform = { [weak self] in self?.perform($0) }
@@ -111,17 +132,13 @@ import FlycutPlatform
         model.pause = { [weak self] in
             guard let self else { return }
             model.isPaused.toggle(); monitor.isPaused = model.isPaused
+            settings.capturePaused = model.isPaused; settingsStore.save(settings)
         }
         model.clear = { [weak self] in self?.enqueue { _ = try await $0.history.clearRecents() } }
         model.merge = { [weak self] in self?.enqueue { _ = try await $0.history.mergeAll() } }
         model.settings = { [weak self] in
             guard let self else { return }
-            if let showSettings { showSettings() } else {
-                let alert = NSAlert()
-                alert.messageText = "Flycut Settings"
-                alert.informativeText = "The grouped settings editor is coming in the next preview task. Capture pause, favorites, export and keyboard help are available in the palette."
-                alert.runModal()
-            }
+            showSettings?()
         }
         model.about = {
             NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Flycut", .applicationVersion: FlycutVersion.current,
@@ -208,7 +225,7 @@ import FlycutPlatform
                 snapshot = try await repository.snapshot()
                 model.selection.update(snapshot)
                 if settings.saveMode == .afterEachClip { try await persist(snapshot) }
-            } catch { model.message = "History could not be updated or saved. Please try again." }
+            } catch { model.message = "History could not be updated or saved. Check the automatic export folder and saved-history access, then try again." }
         }
     }
     private func persist(_ snapshot: HistorySnapshot) async throws {
@@ -219,6 +236,131 @@ import FlycutPlatform
             }
             return
         }
+    }
+
+    private func supportDirectory() throws -> URL {
+        let identity = Bundle.main.bundleIdentifier ?? "com.edynamics.flycut.preview"
+        return try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent(identity, isDirectory: true)
+    }
+
+    /// Reads a complete disk snapshot before granting writes. A cancelled or failed
+    /// recovery leaves the working session and unread destination unchanged.
+    private func prepareSaving(force: Bool = false) async throws -> Bool {
+        if settings.saveMode != .never && persistence != nil && model.storageWarning == nil && !sessionStartedNever && !force { return true }
+        persistence = nil
+        model.storageWarning = "Saving is paused until saved history is loaded successfully. Export session clippings before quitting or retry in Settings."
+        let disk = try SQLiteHistoryRepository(url: try supportDirectory().appendingPathComponent("history.sqlite"))
+        let gate = HistoryPersistence(destination: disk)
+        let staging = try SQLiteHistoryRepository(inMemory: ())
+        try await gate.restore(into: staging)
+        let saved = try await staging.snapshot()
+        let current = try await repository.snapshot()
+        if !saved.recent.isEmpty || !saved.favorites.isEmpty || saved.migration != nil {
+            let alert = NSAlert()
+            alert.messageText = "Load previously saved history?"
+            alert.informativeText = "Saved history contains \(saved.recent.count) recent and \(saved.favorites.count) favorite clippings. Loading it replaces this session's \(current.recent.count + current.favorites.count) in-memory clippings. Export any session clippings you need before continuing. Cancel keeps saving disabled."
+            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Load Saved History")
+            guard alert.runModal() == .alertSecondButtonReturn else { return false }
+            try await repository.replaceAll(saved)
+            settings.recentCapacity = max(settings.recentCapacity, saved.recent.count)
+            settings.favoriteCapacity = max(settings.favoriteCapacity, saved.favorites.count)
+        }
+        configure(settings)
+        persistence = gate; sessionStartedNever = false; model.storageWarning = nil
+        return true
+    }
+
+    private func openSettings() {
+        shell.dismiss()
+        if let settingsWindow { settingsEditor?.value = settings; settingsWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        let editor = SettingsModel(settings)
+        settingsEditor = editor
+        editor.apply = { [weak self, weak editor] in
+            guard let self, let editor else { return }
+            editor.busy = true
+            enqueue { coordinator in
+                defer { editor.busy = false; editor.value = coordinator.settings }
+                do {
+                    var proposed = editor.value
+                    if proposed.saveMode != .never {
+                        guard try await coordinator.prepareSaving() else { editor.message = "Changes cancelled. Export session history before loading saved history."; return }
+                    }
+                    if proposed.openAtLogin != coordinator.settings.openAtLogin {
+                        let status = await coordinator.login.setEnabled(proposed.openAtLogin)
+                        switch status {
+                        case .registered: proposed.openAtLogin = true
+                        case .requiresApproval: editor.message = "Approve Flycut in Login Items Settings."; proposed.openAtLogin = true
+                        case .notRegistered: proposed.openAtLogin = false
+                        case .notFound, .error: editor.message = "Login item change failed. Check Login Items Settings."; proposed.openAtLogin = coordinator.settings.openAtLogin
+                        }
+                    }
+                    coordinator.configure(proposed)
+                    editor.message = coordinator.model.message ?? editor.message ?? "Changes applied."
+                } catch { editor.message = "Saved history could not be read. It has been left untouched. Export your session, repair the database, then use Retry Saved History." }
+            }
+        }
+        editor.importLegacy = { [weak self] in self?.openImport(discover: Bundle.main.bundleIdentifier == "com.edynamics.flycut") }
+        editor.recover = { [weak self, weak editor] in
+            self?.enqueue { coordinator in
+                do {
+                    if try await coordinator.prepareSaving(force: true) { editor?.value = coordinator.settings; editor?.message = "Saved history loaded. Choose a save mode and Apply Changes." } else { editor?.message = "Recovery cancelled. Saved history was left untouched; this session remains in memory until recovery succeeds." }
+                } catch { editor?.message = "Saved history is still unreadable and was left untouched. Export session clippings before quitting." }
+            }
+        }
+        settingsWindow = makeWindow(title: "Flycut Settings", view: SettingsView(model: editor))
+    }
+    private func openImport(discover: Bool) {
+        if let importWindow { importWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        do {
+            let coordinator: MigrationCoordinator
+            if let migration { coordinator = migration } else {
+                coordinator = MigrationCoordinator(destination: repository, backupDirectory: try supportDirectory().appendingPathComponent("Migration Backups"), memoryDestination: repository)
+                migration = coordinator
+            }
+            let found = discover ? LegacySourceDiscovery.discover() : nil
+            let editor = ImportModel(coordinator: coordinator, working: repository, sources: found?.sources ?? [])
+            if !(found?.inaccessibleSources.isEmpty ?? true) { editor.error = "Some legacy sources need file access. Use Choose Preferences File to select them." }
+            editor.close = { [weak self] in self?.importWindow?.close(); self?.importWindow = nil }
+            editor.performImport = { [weak self] editor in
+                guard let self, let source = editor.decision.selectedSource, editor.decision.beginImport() else { return }
+                editor.busy = true
+                let acceptedChoice = editor.decision.choice
+                let acceptedMode = editor.decision.persistentSaveMode
+                let acceptedReport = editor.report
+                enqueue { owner in
+                    defer { editor.busy = false }
+                    do {
+                        // Preparing disk history can change the destination: require a new preview.
+                        let before = try await owner.repository.snapshot()
+                        if acceptedReport?.inMemoryOnly == false {
+                            guard try await owner.prepareSaving() else { editor.decision.failed(); editor.error = "Import cancelled before any source or history was changed."; return }
+                            let after = try await owner.repository.snapshot()
+                            if before != after { editor.decision.failed(); editor.preview(); return }
+                        }
+                        let result = try await coordinator.import(source: source, choice: acceptedChoice, persistentSaveMode: acceptedMode, expectedSourceFingerprint: acceptedReport?.sourceFingerprint, expectedDestinationFingerprint: acceptedReport?.destinationFingerprint)
+                        var adopted = result.settingsForAdoption(preserving: owner.settings)
+                        adopted.openAtLogin = owner.settings.openAtLogin
+                        adopted.appearance = owner.settings.appearance
+                        adopted.rememberPause = owner.settings.rememberPause
+                        adopted.autoSaveToLocation = owner.settings.autoSaveToLocation
+                        adopted.saveForgottenClippings = owner.settings.saveForgottenClippings
+                        adopted.saveForgottenFavorites = owner.settings.saveForgottenFavorites
+                        owner.configure(adopted)
+                        if owner.settings.saveMode == .afterEachClip { try await owner.persist(owner.repository.snapshot()) }
+                        editor.report = result; editor.complete = true; editor.decision.failed(); editor.error = nil
+                        owner.settingsEditor?.value = owner.settings
+                    } catch { editor.decision.failed(); editor.error = "Import failed. Your source is unchanged. The source or destination may have changed, or file access failed. Retry the preview and confirm again." }
+                }
+            }
+            importWindow = makeWindow(title: "Import Legacy Flycut", view: MigrationView(model: editor))
+        } catch { model.message = "Could not open import. Check access to Application Support." }
+    }
+    private func makeWindow<V: View>(title: String, view: V) -> NSWindow {
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        window.title = title; window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(rootView: view)
+        window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        return window
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

@@ -8,6 +8,24 @@ final class LegacyMigrationTests: XCTestCase, @unchecked Sendable {
         try PropertyListSerialization.data(fromPropertyList: ["savePreference": save, "store": ["version": "0.7", "rememberNum": 1, "favoritesRememberNum": 1, "jcList": recent, "favoritesList": favorites]], format: .xml, options: 0)
     }
     var record: [String: Any] { ["Contents": " e\u{301} 🦊\n\tline\r\n", "Type": "NSStringPboardType", "Position": 999, "Timestamp": 0, "AppLocalizedName": "Synthetic", "AppBundleURL": "file:///Synthetic.app"] }
+    func testChangedPreviewSourceAndDestinationRequireNewConfirmation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = LegacySource(url: directory.appendingPathComponent("source.plist"))
+        try fixture([record]).write(to: source.url)
+        let destination = try SQLiteHistoryRepository(inMemory: ())
+        let coordinator = MigrationCoordinator(destination: destination, backupDirectory: directory.appendingPathComponent("backup"))
+        let preview = try await coordinator.preview(source: source)
+        try fixture([record, record]).write(to: source.url)
+        do { _ = try await coordinator.import(source: source, choice: .importNew, expectedSourceFingerprint: preview.sourceFingerprint); XCTFail("Changed source must be reviewed") }
+        catch { XCTAssertEqual(error as? MigrationError, .previewChanged) }
+        let fresh = try await coordinator.preview(source: source)
+        try await destination.replaceAll(LegacyStoreParser.parse(data: fixture([record])).history)
+        do { _ = try await coordinator.import(source: source, choice: .merge(confirmed: true), expectedDestinationFingerprint: fresh.destinationFingerprint); XCTFail("Changed destination must be reviewed") }
+        catch { XCTAssertEqual(error as? MigrationError, .previewChanged) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("backup").path))
+    }
     func testExactLegacyShapeOrderDuplicatesMetadataAndCapacity() throws {
         var second = record; second["Type"] = "public.utf8-plain-text"; second["Timestamp"] = 4_294_967_296 as Int64
         let data = try fixture([record, second], favorites: [second, record])

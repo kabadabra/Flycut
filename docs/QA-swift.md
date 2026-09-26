@@ -79,3 +79,50 @@ The coordinator now listens for workspace app-activation notifications throughou
 A deterministic synthetic regression models A → Flycut → B → mouse reactivation of Flycut, then activates C during the paste focus wait. It verifies that the request activates/checks B, never redirects to A or C, and emits no paste after B loses focus. Another test verifies that own-app and unknown-foreground events do not erase the last external target. Tests initially failed for the missing target-tracking API, then passed with the implementation.
 
 Final verification: 82 tests pass (58 core, 24 platform); Debug bundle/strict signature pass; Graphify refreshed. No UI or clipboard interaction was needed for this revision, and process check confirms no preview or synthetic target remains running. Authorized real paste with app switching remains a Task 10 release check; the controller retains status-item click/anchoring as the explicitly tracked tooling-blocked gate.
+
+## Task 8 — Settings, onboarding and import — 2026-09-26
+
+This section supersedes the Task 7 placeholder-settings integration notes. Settings now has General, Shortcuts, Privacy, Appearance and About tabs, a working shortcut recorder, login/permission adapter actions, typed settings editing, pause restoration, app appearance/icon selection, save-mode recovery and automatic exports before capacity eviction. Automatic exports require a chosen folder and are disabled in save-never mode. An export failure aborts capacity eviction; a filesystem failure after an earlier export can leave an extra recoverable export file.
+
+Production-only onboarding is gated by the exact production bundle identity and absence of a migration marker. Preview builds do not discover production profiles. Manual imports use the file picker, require source selection and explicit review, require merge/replace for a populated destination, and require memory/persistent choice for save-never sources. Source and destination fingerprints reject stale previews. Import does not enable login or adopt an old automatic export folder; those require separate Settings choices. The import window displays unsupported-setting warnings, skipped records and backup locations. The working repository is shared with memory imports, so importing into a populated memory session cannot bypass destination confirmation.
+
+Saving can be enabled only after a full disk snapshot is readable. Existing saved data is staged separately; a modal shows saved/session counts and requires explicit Load Saved History before replacing session memory. Cancel and read failure revoke saving permission, leave disk untouched, and retain session memory. The UI instructs the user to export session clippings before accepting replacement or quitting. Retry Saved History permits recovery after the underlying database is repaired; no automatic repair or replacement of unread data is attempted.
+
+### Automated evidence
+
+- Import-decision tests were written before the decision API existed and initially failed to compile for the missing API; all six now pass. They cover multiple sources, explicit populated-destination choice, save-never choice, cancel without mutation, failed import/retry, production identity gating and a disposable legacy profile with synthetic recents/favorites/settings.
+- Failed-preview-refresh regression initially failed for the missing invalidation API, then passed: an unsuccessful refresh cannot reuse an earlier confirmation.
+- Stale-preview regression initially failed for missing fingerprint API, then passed: changing either source bytes or destination history requires new confirmation before backups or import.
+- Pause/appearance settings round-trip initially failed for missing typed fields, then passed.
+- Eviction tests cover recents and favorites, exact synthetic export bytes, private 0600 permissions, deletion not exporting, and failed export retaining the old clipping. The first test initially failed for the missing archive API.
+- Final `swift test`: **92 XCTest tests, zero failures** (68 core, 24 platform). No compiler warnings or errors. Existing unread-destination, persistence, import backup/idempotency and hotkey/login/permission adapter regressions remain green.
+- `scripts/build-app.sh debug`: successful, strict ad-hoc signature verification passes.
+- `graphify update . --no-cluster`: successful; graph artifacts remain ignored.
+
+### Actual manual observations
+
+QA used `/tmp/Flycut Task8 QA.app`, bundle/domain `com.edynamics.flycut.preview.task8qa`. It had its own disposable preferences and Application Support directory. Capture was paused before its first launch and stayed paused across all sessions. No installed Flycut 2.0 application, production profile, private clipboard contents, permissions or login registration were changed or inspected.
+
+- Opened all settings sections used by the flow. General and import views were inspected in light appearance; applying app-only Dark visibly updated Settings. Privacy buttons were changed to a vertical layout after the initial inspection exposed truncated labels; the corrected view was inspected successfully.
+- Imported a synthetic save-never plist with two recents, one favorite, one malformed record and an unsupported iCloud flag. Preview showed counts, warnings and disabled Import until storage and confirmation were selected. Chose memory only and imported three clips. The QA history directory did **not** exist afterward.
+- Imported a second synthetic, disposable 2.0-shaped profile at `Library/Preferences/com.edynamics.flycut.plist` with on-quit saving. Preview showed the existing 2+1 destination and required an explicit Merge choice. Resulting recent capacity rose to four. Completion showed source/destination backup paths. Both files had 0600 permissions. This exercised legacy profile structure; the old 2.0 executable itself was not launched.
+- Synthetic palette visibly contained four recent rows and two favorites after merge. Quitting saved only the QA database. Relaunch restored those counts and Capture paused. A count-only database query independently confirmed 4 recents/2 favorites.
+- Retry Saved History showed saved/session counts and explicit Cancel/Load choices. Cancel returned without replacing the session; a second attempt with Load succeeded. Unread/corrupted destination handling is covered by automated regressions, not a new manual corruption run.
+- Edited comma-separated privacy lengths to `12, 24, 48` and applied successfully. Lists now retain editable raw text until Apply and reject invalid length entries.
+- Initial accessible button activation did not start shortcut recording because the custom button only handled mouse-down. Changed it to target/action, rebuilt and verified accessibility activation focuses the recorder. Control–Option–X recorded and applied; reset to Shift–Command–V also applied.
+- Preview quit through its own Quit command after QA. Process inspection found no FlycutMac process left running. Disposable app/domain/data were cleaned up after evidence collection.
+
+### Task 10 implementation and release checklist
+
+The product is **not feature-complete**. Import explicitly warns before confirmation that the following mapped legacy preferences have no current preview effect. Each needs implementation and tests, or an explicit spec-consistent removal/migration rationale:
+
+- [ ] `menuPreviewCount` / legacy `displayNum`: apply the configured visible menu preview count to the palette/menu presentation without discarding stored clips or hiding searchable history.
+- [ ] `bezelWidth`, `bezelHeight`: apply user dimensions to the palette/popover while preserving usable minimum sizes and screen bounds; expose working controls.
+- [ ] `bezelAlpha`: apply transparency to the palette background without fading text or reducing readability; expose a working control.
+- [ ] `popUpAnimation`: honor the optional presentation animation and Reduce Motion behavior; expose a working control.
+- [ ] `menuSelectionPastes`: specify and implement copy-versus-paste activation semantics for the new palette (including mouse and keyboard) and test prior-app restoration.
+- [ ] `revealPasteboardTypes`: reveal type metadata only through explicit UI, without logging clipboard contents; expose a working control.
+- [ ] `suppressAccessibilityAlert`: define whether this suppresses an automatic prompt while retaining the visible Copy fallback and permission links; the preview currently never issues an automatic Accessibility prompt.
+- [ ] Real Open at Login registration/approval and permission-grant paths on a disposable signed install. QA used adapter tests and inspected buttons, without changing system permissions or login items.
+- [ ] Native production onboarding with multiple discoverable profiles in a disposable user account, unread-container picker recovery, UI replace flow, actual repaired-database recovery, and an older Flycut-generated profile. Automated fixtures cover these decisions/data shapes but do not replace that release gate.
+- [ ] Repeat complete palette/manual release gates from Task 7: status-item anchoring, authorized paste/sticky focus, VoiceOver, full-screen Space, non-QWERTY input, export/eviction folder interaction, and signing/notarization/downloaded-install checks.
