@@ -154,4 +154,42 @@ final class SettingsTests: XCTestCase {
         XCTAssertNil(store.load().saveToLocation)
         XCTAssertEqual(store.load().recentCapacity, 40)
     }
+
+    func testOneCorruptPersistedFieldCannotDiscardNeverModeOrOtherSettings() {
+        let suite = "SettingsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = SettingsStore(defaults: defaults)
+        var settings = FlycutSettings()
+        settings.saveMode = .never
+        settings.recentCapacity = 73
+        settings.openAtLogin = true
+        store.save(settings)
+        defaults.set("invalid", forKey: "v3.menuIcon")
+        let loaded = store.load()
+        XCTAssertEqual(loaded.saveMode, .never)
+        XCTAssertEqual(loaded.recentCapacity, 73)
+        XCTAssertTrue(loaded.openAtLogin)
+        XCTAssertEqual(loaded.menuIcon, 0)
+    }
+
+    func testMalformedNumericBooleanWarnsAndUsesDefault() {
+        let result = LegacySettingsMapper.map([
+            "skipPasswordFields": 2, "syncSettingsViaICloud": 2,
+            "removeDuplicates": 1, "pasteMovesToTop": 0
+        ])
+        XCTAssertTrue(result.settings.skipPasswordFields)
+        XCTAssertFalse(result.settings.syncSettingsViaICloud)
+        XCTAssertTrue(result.settings.removeDuplicates)
+        XCTAssertFalse(result.settings.pasteMovesToTop)
+        XCTAssertEqual(result.warnings.count, 2)
+    }
+
+    func testOversizedHotkeyNumberDoesNotNarrowIntoValidKeyCode() {
+        let result = LegacySettingsMapper.map([
+            "ShortcutRecorder mainHotkey": ["keyCode": NSDecimalNumber(string: "18446744073709551625"), "modifierFlags": 262_144]
+        ])
+        XCTAssertEqual(result.settings.hotkey, .init(keyCode: 9, modifierFlags: 1_179_648))
+        XCTAssertEqual(result.warnings.count, 1)
+    }
 }

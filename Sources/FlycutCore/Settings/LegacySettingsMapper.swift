@@ -25,7 +25,8 @@ public enum LegacySettingsMapper {
         }
         func boolean(_ key: String, default fallback: Bool) -> Bool {
             guard let raw = value(key) else { return fallback }
-            guard let number = raw as? NSNumber else {
+            guard let number = raw as? NSNumber,
+                  number.doubleValue == 0 || number.doubleValue == 1 else {
                 warnings.append("Unsupported value for \(key); using default.")
                 return fallback
             }
@@ -108,10 +109,12 @@ public enum LegacySettingsMapper {
             if let dictionary = raw as? [String: Any],
                let code = dictionary["keyCode"] as? NSNumber,
                let flags = dictionary["modifierFlags"] as? NSNumber,
+               code.doubleValue.isFinite,
+               flags.doubleValue.isFinite,
                code.doubleValue.rounded() == code.doubleValue,
                flags.doubleValue.rounded() == flags.doubleValue,
-               (0...127).contains(code.intValue),
-               (0...Int(UInt32.max)).contains(flags.intValue) {
+               (0...127).contains(code.doubleValue),
+               (0...Double(UInt32.max)).contains(flags.doubleValue) {
                 settings.hotkey = FlycutHotkey(keyCode: code.intValue, modifierFlags: flags.intValue)
             } else {
                 warnings.append("Unsupported ShortcutRecorder mainHotkey; using Shift-Command-V.")

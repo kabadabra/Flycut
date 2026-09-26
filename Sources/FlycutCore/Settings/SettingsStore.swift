@@ -15,7 +15,14 @@ public struct SettingsStore {
             return fallback
         }
         for key in Array(dictionary.keys) + ["saveToLocation", "autoSaveToLocation"] {
-            if let value = defaults.object(forKey: prefix + key) { dictionary[key] = value }
+            guard let value = defaults.object(forKey: prefix + key) else { continue }
+            var trial = dictionary
+            trial[key] = value
+            guard let trialData = try? JSONSerialization.data(withJSONObject: trial),
+                  (try? JSONDecoder().decode(FlycutSettings.self, from: trialData)) != nil else {
+                continue
+            }
+            dictionary = trial
         }
         guard let merged = try? JSONSerialization.data(withJSONObject: dictionary),
               var decoded = try? JSONDecoder().decode(FlycutSettings.self, from: merged) else {
