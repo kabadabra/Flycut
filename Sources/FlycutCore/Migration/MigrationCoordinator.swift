@@ -27,7 +27,7 @@ public actor MigrationCoordinator {
             history = try await self.destination.snapshot()
         }
         var report = Self.report(source: source, parsed: parsed, destination: history)
-        report.alreadyImported = Self.contains(history.migration, identity: source.identity)
+        report.alreadyImported = Self.contains(history.migration, source: source)
         if case .merge = choice, !report.alreadyImported {
             report.settings.recentCapacity = max(report.settings.recentCapacity, history.recent.count + report.recentCount)
             report.settings.favoriteCapacity = max(report.settings.favoriteCapacity, history.favorites.count + report.favoriteCount)
@@ -39,7 +39,8 @@ public actor MigrationCoordinator {
     }
 
     /// A persistent mode is an explicit user opt-in when the legacy save mode is never.
-    /// Adopt activeRepository and report.settings together after a successful import.
+    /// Adopt activeRepository and report.settingsForAdoption(preserving: currentSettings)
+    /// together. No-op imports retain current settings and only raise insufficient capacities.
     public func `import`(source: LegacySource, choice: MigrationChoice, persistentSaveMode: SaveMode? = nil) async throws -> MigrationReport {
         guard !importing else { throw MigrationError.importInProgress }
         importing = true
@@ -56,7 +57,7 @@ public actor MigrationCoordinator {
         } else { target = destination }
         let before = try await target.snapshot()
         var report = Self.report(source: source, parsed: parsed, destination: before)
-        if Self.contains(before.migration, identity: source.identity) {
+        if Self.contains(before.migration, source: source) {
             report.alreadyImported = true
             activeRepository = target
             return report
@@ -69,7 +70,7 @@ public actor MigrationCoordinator {
         let imported = parsed.history
         let timestamp = Date()
         let result = try await target.update { current in
-            if Self.contains(current.migration, identity: source.identity) { return }
+            if Self.contains(current.migration, source: source) { return }
             try Self.validate(choice, destination: current)
             if !memoryOnly && (!current.recent.isEmpty || !current.favorites.isEmpty) {
                 try Self.privateWrite(JSONEncoder().encode(current), to: destinationBackup)
@@ -95,8 +96,9 @@ public actor MigrationCoordinator {
         return report
     }
 
-    private static func contains(_ marker: MigrationMarker?, identity: String) -> Bool {
-        marker?.sourceIdentity == identity || marker?.importedSourceIdentities?.contains(identity) == true
+    private static func contains(_ marker: MigrationMarker?, source: LegacySource) -> Bool {
+        guard let marker else { return false }
+        return ([marker.sourceIdentity] + (marker.importedSourceIdentities ?? [])).contains { source.matchesStoredIdentity($0) }
     }
 
     private static func validate(_ choice: MigrationChoice, destination: HistorySnapshot) throws {
@@ -108,8 +110,12 @@ public actor MigrationCoordinator {
     }
 
     private static func report(source: LegacySource, parsed: LegacySnapshot, destination: HistorySnapshot) -> MigrationReport {
-        MigrationReport(source: source, recentCount: parsed.history.recent.count, favoriteCount: parsed.history.favorites.count,
-                        destinationCount: destination.recent.count + destination.favorites.count, settings: parsed.settings,
+        var settings = parsed.settings
+        settings.recentCapacity = max(settings.recentCapacity, destination.recent.count)
+        settings.favoriteCapacity = max(settings.favoriteCapacity, destination.favorites.count)
+        return MigrationReport(source: source, recentCount: parsed.history.recent.count, favoriteCount: parsed.history.favorites.count,
+                        destinationCount: destination.recent.count + destination.favorites.count,
+                        destinationRecentCount: destination.recent.count, destinationFavoriteCount: destination.favorites.count, settings: settings,
                         skipped: parsed.skipped, warnings: parsed.warnings, inMemoryOnly: parsed.settings.saveMode == .never)
     }
 

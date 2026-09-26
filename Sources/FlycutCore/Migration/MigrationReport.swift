@@ -2,10 +2,24 @@ import Foundation
 
 public struct LegacySource: Sendable, Equatable {
     public let url: URL
+    /// The same file selected through discovery, the picker, or a symlink has one identity.
     public let identity: String
-    public init(url: URL, identity: String? = nil) {
+    public let displayDomain: String?
+
+    public init(url: URL) {
         self.url = url
-        self.identity = identity ?? url.standardizedFileURL.path
+        let canonicalURL = url.resolvingSymlinksInPath().standardizedFileURL
+        self.identity = canonicalURL.path
+        self.displayDomain = LegacySourceDiscovery.domains.first { domain in
+            canonicalURL.path.hasSuffix("/Library/Preferences/\(domain).plist")
+        }
+    }
+
+    /// Accept markers written by the earlier domain/path implementation as aliases.
+    internal func matchesStoredIdentity(_ stored: String) -> Bool {
+        if stored == identity || stored == displayDomain { return true }
+        guard stored.hasPrefix("/") else { return false }
+        return URL(fileURLWithPath: stored).resolvingSymlinksInPath().standardizedFileURL.path == identity
     }
 }
 
@@ -27,6 +41,8 @@ public struct MigrationReport: Sendable {
     public let recentCount: Int
     public let favoriteCount: Int
     public let destinationCount: Int
+    public let destinationRecentCount: Int
+    public let destinationFavoriteCount: Int
     public var settings: FlycutSettings
     public let skipped: [SkippedLegacyRecord]
     public var warnings: [String]
@@ -35,6 +51,16 @@ public struct MigrationReport: Sendable {
     public var inMemoryOnly: Bool
     public var sourceBackup: URL?
     public var destinationBackup: URL?
+
+    /// Source settings are applied only when new data is imported. A no-op retains
+    /// the user's current preferences while ensuring capacity fits retained history.
+    public func settingsForAdoption(preserving current: FlycutSettings) -> FlycutSettings {
+        guard alreadyImported else { return settings }
+        var result = current
+        result.recentCapacity = max(result.recentCapacity, destinationRecentCount)
+        result.favoriteCapacity = max(result.favoriteCapacity, destinationFavoriteCount)
+        return result
+    }
 }
 
 public enum MigrationChoice: Sendable {
@@ -52,16 +78,17 @@ public enum MigrationError: Error, Equatable, Sendable {
 }
 
 public struct LegacySourceDiscovery: Sendable {
+    internal static let domains = ["com.edynamics.flycut", "com.kabadabra.flycut", "com.generalarcade.flycut"]
     public let sources: [LegacySource]
     public let inaccessibleSources: [LegacySource]
     public let offersFilePicker = true
 
     public static func candidates(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [LegacySource] {
-        ["com.edynamics.flycut", "com.kabadabra.flycut", "com.generalarcade.flycut"].map { domain in
+        domains.map { domain in
             let path = domain == "com.generalarcade.flycut"
                 ? "Library/Containers/\(domain)/Data/Library/Preferences/\(domain).plist"
                 : "Library/Preferences/\(domain).plist"
-            return LegacySource(url: home.appendingPathComponent(path), identity: domain)
+            return LegacySource(url: home.appendingPathComponent(path))
         }
     }
 
