@@ -2,6 +2,8 @@
 *.swp
 *~.nib
 build/
+.build/
+.swiftpm/
 *.pbxuser
 *.perspective
 *.perspectivev3

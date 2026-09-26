@@ -1,15 +1,23 @@
 # Developing Flycut
 
-## Local checks
+## Active Swift build
 
-Run the macOS build in the README. A Release archive uses:
+Use Xcode 27.0 with Swift 6.4; the package uses Swift 6 language mode and targets macOS 13. Open `Package.swift` directly in Xcode. `FlycutCore` owns history, settings and migration; `FlycutPlatform` adapts macOS services; `FlycutMac` contains the AppKit/SwiftUI shell.
 
 ```sh
-xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
-  -archivePath build/Flycut.xcarchive CODE_SIGNING_ALLOWED=NO archive
+swift test
+scripts/build-app.sh debug
+scripts/build-app.sh release
+scripts/verify-app.sh 'build/Export/Flycut Evolution.app'
 ```
 
-Check the resulting app ID with `/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/Flycut.xcarchive/Products/Applications/Flycut.app/Contents/Info.plist`.
+Debug produces `build/Preview/Flycut Evolution Preview.app`, using a separate preview identity. Release builds both arm64 and x86_64 and produces a universal `build/Export/Flycut Evolution.app` with the production identity. Debug previews use the host architecture. Neither script launches or installs the app. `VERSION=X.Y.Z` overrides both bundle version fields; otherwise they use `App/AppInfo.plist`. Local builds are ad hoc signed. CI runs tests and both builds on Xcode 27, plus bundle verification.
+
+Legacy Objective-C, bundled libraries and iOS sources remain historical source outside Package.swift. A separate `legacy-2` CI job continues to check the old Xcode project until Swift QA passes; remove that job only after migration, UI and installation review. Release automation already packages the Swift app.
+
+## Manual release gates
+
+Exercise migration with synthetic plists and a disposable 2.0 profile, then menu click, search focus, hotkey navigation, copy/paste into another app, favorites, light/dark appearance, full-screen Spaces, VoiceOver, clipboard/Accessibility prompts and Login Items approval on macOS 27. Test a downloaded signed DMG and its contained app. Record results before publication. Do not replace a daily-use installation for automated tests. See [release setup](../RELEASE_SETUP.md).
 
 ## QMD
 
@@ -36,10 +44,6 @@ graphify hook install
 ```
 
 `graphify-out/` is ignored by Git. The hook only affects your local checkout. `AGENTS.md` describes how to consult and refresh the graph during code work. Graphify's Codex hook configuration is local because it includes an install-specific executable path.
-
-## Modernization roadmap
-
-Keep the AppKit UI and data format stable through the macOS 27 release. After that, isolate and test clipboard capture, hotkeys, and login registration one at a time. Swift can replace each module behind a small Objective-C interface; a whole-app rewrite should wait until equivalent behavior and saved-history migration have automated coverage.
 
 ## Updating from upstream
 

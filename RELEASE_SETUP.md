@@ -1,10 +1,12 @@
-# Releasing the Flycut fork
+# Releasing Flycut Evolution (3.0.0)
 
-The public macOS channel is a Developer ID signed, notarized DMG built on GitHub's Xcode 27 runner by [the release workflow](.github/workflows/release.yml). The workflow signs both the app and disk image before notarization, then checks the stapled image with Gatekeeper. A tag named `vX.Y.Z` triggers publication. `workflow_dispatch` builds an artifact for testing without publishing a GitHub Release.
+The [release workflow](.github/workflows/release.yml) builds the Swift package on the configured `xcode-27` runner with Xcode 27.0, runs tests, bundles a universal arm64/x86_64 `Flycut Evolution.app`, signs with Developer ID and hardened runtime, notarizes/staples the app, then creates, signs, notarizes/staples and validates `Flycut-Evolution.dmg`. It also mounts the image read-only and verifies the app inside it. This runner label must be available in the repository; it is not the `macos-latest` label.
+
+Publication requires a push of a tag matching exactly `vX.Y.Z`. A manual `workflow_dispatch` is always a **nonpublishing signed dry run**, even when run against a tag. Both paths require all signing/notarization credentials; missing credentials fail rather than producing a public-looking unsigned artifact. Local ad hoc builds remain available through `scripts/build-app.sh`.
 
 ## One-time Apple setup
 
-Use the Developer ID Application certificate for the Emerging Dynamics signing team (`M2L9SL9WCS`). The app and helper use `com.edynamics.flycut` and `com.edynamics.flycut.helper`. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
+Use the Developer ID Application certificate for the Emerging Dynamics signing team (`M2L9SL9WCS`). The Swift app uses `com.edynamics.flycut` and has no embedded legacy login helper or CloudKit framework. Export the certificate and private key as a password-protected `.p12`. In App Store Connect, create a Team API key that can submit notarization requests; download its `.p8` file and record its Key ID and Issuer ID. The original project's team ID, iCloud container, and App Store listing do not belong to this fork.
 
 In the fork's GitHub repository, add these Actions secrets:
 
@@ -27,13 +29,29 @@ gh secret set NOTARY_KEY_ID -R "$REPO" --body 'XXXXXXXXXX'
 gh secret set NOTARY_ISSUER_ID -R "$REPO" --body 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 ```
 
-Do not commit credentials. Tag builds stop before publication if signing or notarization credentials are missing. A manual run without them still produces an ad hoc signed test DMG that Gatekeeper will warn about.
+Do not commit credentials. The workflow uses temporary private files and a temporary keychain, and cleans them up without replacing the runner's normal keychain search list.
 
-## Cut a release
+## Review and dry run
 
-1. Verify the macOS build, the `com.edynamics.flycut` bundle identifier, and Developer ID team `M2L9SL9WCS`.
-2. Update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the macOS Flycut target. Add a matching `## X.Y.Z` section to `CHANGELOG.md`.
-3. Push a `vX.Y.Z` tag from the reviewed commit. The workflow signs nested code and the DMG, notarizes and staples the DMG, and publishes it on the fork.
-4. Download the public DMG and verify it on a separate Mac before telling users to upgrade.
+1. Use Xcode 27.0 / Swift 6.4. Run `swift test`, `scripts/build-app.sh debug`, `scripts/build-app.sh release`, and `scripts/verify-app.sh 'build/Export/Flycut Evolution.app'`.
+2. Check `App/AppInfo.plist`: production ID `com.edynamics.flycut`, version and build version `3.0.0`, minimum macOS `13.0`. Version tags supply a strictly numeric `VERSION` environment value to the bundler; branch dry runs use the committed plist version. Update both plist version fields and the matching `## X.Y.Z` changelog section for later releases.
+3. Complete and record the manual gates in [developer notes](docs/DEVELOPING.md): migration, menu/palette, keyboard/paste, privacy, Accessibility, Login Items, and macOS 27 installation. Keep the separate legacy 2.0 CI job until Swift QA passes.
+4. Run the reviewed commit through CI and manually dispatch **Build and Release**. Download the `Flycut-Evolution-dmg` artifact. This signs and notarizes but does not publish.
+5. Verify the downloaded DMG and mounted app, then complete an installation test using a disposable profile or test Mac. Do not replace a daily-use app until review is complete.
 
-The app can read and save local history without iCloud. CloudKit sync is not configured for the fork, and the original Mac App Store channel is not controlled here. The app's new identifier means existing users can keep the upstream app installed and import their saved preferences into this fork as described in the README.
+```sh
+codesign --verify --strict --verbose=2 Flycut-Evolution.dmg
+xcrun stapler validate Flycut-Evolution.dmg
+spctl -a -t open --context context:primary-signature -vv Flycut-Evolution.dmg
+# After mounting the image, pass its actual app path:
+VERSION=3.0.0 REQUIRE_DEVELOPER_ID=1 REQUIRE_NOTARIZATION=1 \
+  scripts/verify-app.sh '/Volumes/Flycut Evolution/Flycut Evolution.app'
+```
+
+`verify-app.sh` checks the production bundle/executable, version, macOS floor, arm64 and x86_64 executable slices, icon and signature. Release mode also requires Developer ID Application authority, team `M2L9SL9WCS`, hardened runtime, timestamp, valid stapled ticket and Gatekeeper acceptance. A local ad hoc verification does not establish notarization or installation readiness.
+
+## Publish after approval
+
+After every gate passes, push `v3.0.0` from the reviewed commit. Only the tag-push event may create a GitHub Release. The DMG contains **Flycut Evolution.app** and an Applications shortcut. Release notes include the exact matching changelog section, contributor credits, macOS requirements and migration instructions. Preserve the [v2.0.0 release](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0) for macOS 12 users.
+
+Flycut remains free and MIT licensed, maintained by Emerging Dynamics, with credit to TermiT/Flycut, Jumpcut and merged contributors. CloudKit sync is unavailable. The production Swift app shares the 2.0 identity: quit the old app, explicitly launch the new app, verify migration and backups, then remove the old `Flycut 2.0.app`. See the [upgrade guide](readme.md#moving-to-flycut-evolution).
