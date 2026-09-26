@@ -3,10 +3,12 @@ import Foundation
 public struct MigrationMarker: Codable, Equatable, Sendable {
     public let sourceIdentity: String
     public let importedAt: Date
+    public let importedSourceIdentities: [String]?
 
-    public init(sourceIdentity: String, importedAt: Date) {
+    public init(sourceIdentity: String, importedAt: Date, importedSourceIdentities: [String]? = nil) {
         self.sourceIdentity = sourceIdentity
         self.importedAt = importedAt
+        self.importedSourceIdentities = importedSourceIdentities
     }
 }
 
