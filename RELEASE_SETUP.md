@@ -1,4 +1,6 @@
-# Releasing Flycut Evolution (3.0.0)
+# Historical release setup
+
+> This repository is no longer maintained. Flycut 2.0.0 was its last release. For current Swift builds and releases, use [Flycut Evolution](https://github.com/kabadabra/Flycut-Evolution). The instructions below are retained only as a record of the unreleased transition prototype.
 
 The [release workflow](.github/workflows/release.yml) builds the Swift package on the configured `xcode-27` runner with Xcode 27.0, runs tests, bundles a universal arm64/x86_64 `Flycut Evolution.app`, signs with Developer ID and hardened runtime, notarizes/staples the app, then creates, signs, notarizes/staples and validates `Flycut-Evolution.dmg`. It also mounts the image read-only and verifies the app inside it. This runner label must be available in the repository; it is not the `macos-latest` label.
 

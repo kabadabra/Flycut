@@ -1,38 +1,10 @@
 # Changelog
 
-## 3.0.0 (2026-09-26)
+> This repository is no longer maintained. The Swift prototype notes below were never released here. The completed Swift rewrite is [Flycut Evolution 1.0.0](https://github.com/kabadabra/Flycut-Evolution/releases/tag/v1.0.0); [Flycut 2.0.0](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0) is the last release from this repository.
 
-Flycut Evolution (version 3.0.0) is a complete Swift rewrite of the free, MIT licensed clipboard manager, maintained by Emerging Dynamics. It supports macOS 13 or later on Apple Silicon and Intel. [Flycut 2.0 remains available for macOS 12](https://github.com/kabadabra/Flycut/releases/tag/v2.0.0).
+## Unreleased Swift prototype (superseded)
 
-### What’s new
-
-- A taller, more compact searchable palette for recent clippings and favorites, opened from the menu bar or a configurable keyboard shortcut. Rows show the source app without a changing timestamp. The first click selects immediately; double-click or Return copies and pastes when the previous app has an editable field focused. Keyboard help, pause, and text export remain available.
-- Refreshed settings for history, shortcuts, privacy, appearance, and startup behavior. Flycut can remember your chosen pause state and uses the current macOS Login Items system.
-- Local history with private storage and safer clipboard capture. Automatic paste checks Accessibility permission and editable focus; activation leaves the clipping copied when paste is unavailable.
-
-### Moving from an older Flycut
-
-- Review a preview of your old clippings and settings before import. Flycut preserves their order and available metadata, makes a private backup of the source, and leaves the original file untouched.
-- Choose how to handle an existing destination and whether imported history stays in memory or is saved. Imported history can raise capacity so clippings are not trimmed during the move.
-- Quit Flycut 2.0 before opening the new app. Verify your imported history before removing the old app. Both versions use the same app identity. See the [upgrade guide](https://github.com/kabadabra/Flycut#moving-to-flycut-evolution).
-- iCloud sync is unavailable in this fork; imported cloud settings do not enable it.
-
-### For developers
-
-- Swift 6 core with a SwiftUI palette and settings, plus an AppKit shell for menu bar, keyboard, and focus behavior.
-- Versioned SQLite history, separate preview data, and automated tests for migration, capture, paste, settings, and persistence.
-- Universal release builds use Developer ID signing, hardened runtime, notarization, and stapling for the app and DMG.
-
-### Credits
-
-Flycut is a fork of [TermiT/Flycut](https://github.com/TermiT/Flycut). Original Flycut was created by General Arcade, Gennadiy Potapov, and contributors, and is based on Jumpcut by Steve Cook.
-
-### Thank you to contributors
-
-- [Emanuel Stadler (@emanuelst)](https://github.com/emanuelst) for the [macOS 27 menu bar fix](https://github.com/TermiT/Flycut/pull/328), merged upstream, and the [bezel rendering improvements](https://github.com/TermiT/Flycut/pull/327), adapted in [our PR #3](https://github.com/kabadabra/Flycut/pull/3).
-- [Ilya Bersenev (@voidless)](https://github.com/voidless) for the [keyboard layout paste fix](https://github.com/TermiT/Flycut/pull/314) inherited from upstream.
-- [Tyler Martin (@tymrtn)](https://github.com/tymrtn) for the [CloudKit startup fix](https://github.com/TermiT/Flycut/pull/322) inherited from upstream.
-- [@agentheath](https://github.com/agentheath) for the [macOS 26 menu bar crash fix](https://github.com/TermiT/Flycut/pull/323) inherited from upstream.
+An early Swift rewrite was started here but never released. Its development continued as [Flycut Evolution](https://github.com/kabadabra/Flycut-Evolution), whose versions begin at 1.0.0 in the new repository.
 
 ## 2.0.0 (2026-09-24)
 
